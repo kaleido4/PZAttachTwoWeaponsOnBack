@@ -1,0 +1,185 @@
+dofile(ROOT .. "/tests/harness.lua")
+dofile(VANILLA .. "shared/NPCs/AttachedLocations.lua")
+dofile(VANILLA .. "client/Hotbar/ISHotbarAttachDefinition.lua")
+dofile(VANILLA .. "client/Hotbar/ISHotbar.lua")
+dofile(VANILLA .. "shared/TimedActions/ISAttachItemHotbar.lua")
+dofile(VANILLA .. "client/TimedActions/ISDetachItemHotbar.lua")
+MODEL_SCRIPTS = loadCharacterModels()
+dofile(MOD .. "shared/AttachTwoWeaponsOnBack/ATWOB_Shared.lua")
+dofile(MOD .. "client/AttachTwoWeaponsOnBack/ATWOB_Hotbar.lua")
+fire("OnGameBoot")
+
+local BACK, BACK2 = 1, 2
+
+local function newPlayer()
+    local chr = newCharacter()
+    return chr, newHotbar(chr)
+end
+
+local function shotgun(chr) return chr:addItem(newItem("Rifle", { name = "Shotgun" })) end
+local function crowbar(chr) return chr:addItem(newItem("BigBlade", { name = "Crowbar" })) end
+
+print("ATWOB hotbar")
+
+test("a new character has Back and Back 2 on keys 1 and 2", function()
+    local chr, hotbar = newPlayer()
+    eq(slotTypes(hotbar), "Back,ATWOB_Back2", "slots")
+    eq(table.concat(chr.modData.hotbar, ","), "Back,ATWOB_Back2", "saved slots")
+end)
+
+test("Back 2 takes every item Back takes", function()
+    local back
+    for _, def in ipairs(ISHotbarAttachDefinition) do
+        if def.type == "Back" then back = def end
+    end
+    eq(count(ATWOB.slotDef.attachments), count(back.attachments), "item types")
+    for attachmentType, location in pairs(back.attachments) do
+        eq(ATWOB.slotDef.attachments[attachmentType], ATWOB.mirrorLocation(location), attachmentType)
+    end
+end)
+
+test("a shotgun and a crowbar go on the back together, each on its own key", function()
+    local chr, hotbar = newPlayer()
+    local crowbarItem, shotgunItem = crowbar(chr), shotgun(chr)
+    attach(hotbar, crowbarItem, BACK)
+    attach(hotbar, shotgunItem, BACK2)
+    hotbar:update()
+    hotbar:update()
+    eq(hotbar.attachedItems[BACK], crowbarItem, "key 1")
+    eq(hotbar.attachedItems[BACK2], shotgunItem, "key 2")
+    eq(crowbarItem:getAttachedToModel(), "Blade On Back", "crowbar location")
+    eq(shotgunItem:getAttachedToModel(), "ATWOB Rifle On Back", "shotgun location")
+    checkModel(hotbar)
+end)
+
+test("two rifles go on the back together", function()
+    local chr, hotbar = newPlayer()
+    local first, second = shotgun(chr), shotgun(chr)
+    attach(hotbar, first, BACK)
+    attach(hotbar, second, BACK2)
+    hotbar:update()
+    eq(first:getAttachedToModel(), "Rifle On Back", "first")
+    eq(second:getAttachedToModel(), "ATWOB Rifle On Back", "second")
+    checkModel(hotbar)
+end)
+
+test("Back 2 does not take belt items", function()
+    local chr, hotbar = newPlayer()
+    local hammer = chr:addItem(newItem("Hammer"))
+    truthy(not hotbar:canBeAttached(hotbar.availableSlot[BACK2], hammer), "hammer")
+    truthy(hotbar:canBeAttached(hotbar.availableSlot[BACK2], shotgun(chr)), "shotgun")
+end)
+
+test("Back 2 stays when worn items add and remove slots", function()
+    local chr, hotbar = newPlayer()
+    local belt = newBelt()
+    local shotgunItem = shotgun(chr)
+    local hammer = chr:addItem(newItem("Hammer"))
+    attach(hotbar, shotgunItem, BACK2)
+    chr:wear(belt)
+    clothingUpdated(hotbar)
+    eq(slotTypes(hotbar), "Back,ATWOB_Back2,SmallBeltLeft,SmallBeltRight", "with a belt")
+    attach(hotbar, hammer, 3)
+    checkModel(hotbar)
+    chr:takeOff(belt)
+    clothingUpdated(hotbar)
+    eq(slotTypes(hotbar), "Back,ATWOB_Back2", "without the belt")
+    eq(hotbar.attachedItems[BACK2], shotgunItem, "shotgun still on Back 2")
+    eq(hammer:getAttachedSlot(), -1, "hammer off the hotbar")
+    checkModel(hotbar)
+end)
+
+test("with a bag on, both back items go beside it, and come back when it is off", function()
+    local chr, hotbar = newPlayer()
+    local bag = newBackpack()
+    local shotgunItem, crowbarItem = shotgun(chr), crowbar(chr)
+    attach(hotbar, shotgunItem, BACK)
+    attach(hotbar, crowbarItem, BACK2)
+    chr:wear(bag)
+    clothingUpdated(hotbar)
+    eq(shotgunItem:getAttachedToModel(), "Rifle On Back with Bag", "shotgun with a bag")
+    eq(crowbarItem:getAttachedToModel(), "ATWOB Big Blade On Back with Bag", "crowbar with a bag")
+    checkModel(hotbar)
+    chr:takeOff(bag)
+    clothingUpdated(hotbar)
+    eq(shotgunItem:getAttachedToModel(), "Rifle On Back", "shotgun without the bag")
+    eq(crowbarItem:getAttachedToModel(), "ATWOB Blade On Back", "crowbar without the bag")
+    checkModel(hotbar)
+end)
+
+test("a guitar comes off Back 2 when a bag goes on, like off Back", function()
+    local chr, hotbar = newPlayer()
+    local guitar = chr:addItem(newItem("Guitar"))
+    attach(hotbar, guitar, BACK2)
+    eq(guitar:getAttachedToModel(), "ATWOB Guitar", "guitar location")
+    chr:wear(newBackpack())
+    clothingUpdated(hotbar)
+    eq(guitar:getAttachedSlot(), -1, "guitar off the hotbar")
+    eq(chr.attached["ATWOB Guitar"], nil, "guitar off the model")
+    truthy(not hotbar:canBeAttached(hotbar.availableSlot[BACK2], guitar), "guitar refused")
+    checkModel(hotbar)
+end)
+
+test("attaching with the animation puts the item on the mirrored bag location", function()
+    local chr, hotbar = newPlayer()
+    chr:wear(newBackpack())
+    clothingUpdated(hotbar)
+    local first, second = shotgun(chr), shotgun(chr)
+    attach(hotbar, first, BACK)
+    local def = hotbar.availableSlot[BACK2].def
+    hotbar:attachItem(second, def.attachments.Rifle, BACK2, def, true)
+    local action = ISTimedActionQueue.actions[#ISTimedActionQueue.actions]
+    eq(action.Type, "ISAttachItemHotbar", "queued action")
+    eq(action.slot, "ATWOB Rifle On Back with Bag", "action location")
+    action:perform()
+    eq(hotbar.attachedItems[BACK2], second, "on Back 2")
+    eq(second:getAttachedToModel(), "ATWOB Rifle On Back with Bag", "location")
+    checkModel(hotbar)
+end)
+
+test("a save from before the mod gets Back 2 as key 2, and its items keep their slots", function()
+    local chr = newCharacter()
+    chr.modData.hotbar = { "Back", "SmallBeltLeft", "SmallBeltRight" }
+    chr:wear(newBelt())
+    local saved = {
+        { newItem("Rifle", { name = "Shotgun" }), 1, "Back", "Rifle On Back" },
+        { newItem("Hammer"), 2, "SmallBeltLeft", "Belt Left" },
+        { newItem("Screwdriver"), 3, "SmallBeltRight", "Belt Right Screwdriver" },
+    }
+    for _, s in ipairs(saved) do
+        local item = chr:addItem(s[1])
+        item:setAttachedSlot(s[2])
+        item:setAttachedSlotType(s[3])
+        item:setAttachedToModel(s[4])
+    end
+    local hotbar = newHotbar(chr)
+    hotbar:update()
+    eq(slotTypes(hotbar), "Back,ATWOB_Back2,SmallBeltLeft,SmallBeltRight", "slots")
+    eq(table.concat(chr.modData.hotbar, ","), "Back,ATWOB_Back2,SmallBeltLeft,SmallBeltRight", "saved slots")
+    eq(hotbar.attachedItems[1], saved[1][1], "shotgun on key 1")
+    eq(hotbar.attachedItems[2], nil, "Back 2 empty")
+    eq(hotbar.attachedItems[3], saved[2][1], "hammer on key 3")
+    eq(hotbar.attachedItems[4], saved[3][1], "screwdriver on key 4")
+    checkModel(hotbar)
+end)
+
+test("a save with the mod loads back the same", function()
+    local chr, hotbar = newPlayer()
+    chr:wear(newBelt())
+    clothingUpdated(hotbar)
+    local crowbarItem = crowbar(chr)
+    local hammer = chr:addItem(newItem("Hammer"))
+    attach(hotbar, crowbarItem, BACK2)
+    attach(hotbar, hammer, 3)
+    -- Load: a new hotbar from the saved character, nothing on the model yet.
+    chr.attached = {}
+    hotbar = newHotbar(chr)
+    hotbar:update()
+    eq(slotTypes(hotbar), "Back,ATWOB_Back2,SmallBeltLeft,SmallBeltRight", "slots")
+    eq(hotbar.attachedItems[BACK2], crowbarItem, "crowbar on Back 2")
+    eq(hotbar.attachedItems[3], hammer, "hammer on key 3")
+    eq(crowbarItem:getAttachedToModel(), "ATWOB Blade On Back", "crowbar location")
+    checkModel(hotbar)
+end)
+
+finish("ATWOB hotbar")

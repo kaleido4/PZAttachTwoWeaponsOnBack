@@ -1,0 +1,17 @@
+name=Attach Two Weapons On Back
+id=PZAttachTwoWeaponsOnBack
+author=kaleido4
+modversion=1.0.0
+versionMin=42.0.0
+poster=poster.png
+icon=icon.png
+description=Adds a second back slot to the hotbar, so you can carry two weapons on your back, like a shotgun and a crowbar, each on its own hotbar key. <LINE>
+description= <LINE>
+description=* "Back 2" sits right after "Back" on the hotbar (key 2). Belts, holsters and other slots move up one. <LINE>
+description=* It takes everything the vanilla back slot takes: rifles, shotguns, axes, bats, crowbars, swords, shovels, rackets, pans, guitars. <LINE>
+description=* The second item is mirrored across your back, so the two cross instead of clipping into each other. <LINE>
+description=* With a backpack on, both go beside the bag, one on each side. Guitars come off, like in vanilla. <LINE>
+description= <LINE>
+description=Can be added to existing saves. <LINE>
+description=Before removing the mod, take the item off Back 2. <LINE>
+description=Does not replace game files.
