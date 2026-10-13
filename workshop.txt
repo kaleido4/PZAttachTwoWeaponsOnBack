@@ -1,5 +1,5 @@
 version=1
-title=Attach Two Weapons On Back
+title=Second Back Slot - Carry Two Weapons On Your Back
 description=Adds a second back slot to the hotbar, so you can carry two weapons on your back, like a shotgun and a crowbar, each on its own hotbar key.
 description=
 description=[list]

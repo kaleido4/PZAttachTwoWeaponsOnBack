@@ -1,5 +1,5 @@
 --[[
-    Attach Two Weapons On Back: a second back slot on the hotbar.
+    Second Back Slot: a second back slot on the hotbar.
 
     The slot ("Back 2") takes the same items as the vanilla back slot and puts
     them on the mirrored locations from ATWOB_Shared.lua. ISHotbar is wrapped,
@@ -8,8 +8,9 @@
         one a worn item provides. Ours stays, like the back slot.
       * loadPosition: adds the slot after the back slot (key 2) on a new
         character, and to saves made without the mod. With a Strength
-        requirement (sandbox), the slot only shows up from that level, checked
-        every in-game minute.
+        requirement (sandbox), the slot only shows up from that level.
+      * update: adds or takes away the slot as soon as Strength crosses the
+        requirement while playing.
       * attachItem / canBeAttached: with a bag on, vanilla moves back items
         beside it, but only for slots named "Back". Ours does the same with the
         mirrored "with Bag" locations.
@@ -185,19 +186,19 @@ function ISHotbar:loadPosition()
     ATWOB.fixAttachedSlots(self)
 end
 
--- Strength, and the sandbox option, can change while playing. Not during a
--- timed action, which may be about to use a slot index.
-Events.EveryOneMinute.Add(function()
-    for playerNum = 0, getNumActivePlayers() - 1 do
-        local hotbar = getPlayerHotbar(playerNum)
-        local queue = hotbar and ISTimedActionQueue.queues[hotbar.chr]
-        if hotbar and not (queue and #queue.queue > 0) and ATWOB.updateSlot(hotbar) then
-            ATWOB.fixAttachedSlots(hotbar)
-            hotbar:reloadIcons()
-            hotbar:savePosition()
-        end
+-- Strength, and the sandbox option, can change while playing: the slot follows
+-- on the next frame, where vanilla also drops hotbar items that no longer fit.
+-- Not during a timed action, which may be about to use a slot index.
+local original_update = ISHotbar.update
+function ISHotbar:update()
+    local queue = ISTimedActionQueue.queues[self.chr]
+    if not (queue and #queue.queue > 0) and ATWOB.updateSlot(self) then
+        ATWOB.fixAttachedSlots(self)
+        self:reloadIcons()
+        self:savePosition()
     end
-end)
+    return original_update(self)
+end
 
 local original_canBeAttached = ISHotbar.canBeAttached
 function ISHotbar:canBeAttached(slot, item)

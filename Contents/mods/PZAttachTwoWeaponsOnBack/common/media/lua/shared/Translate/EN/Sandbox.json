@@ -1,5 +1,5 @@
 {
-    "Sandbox_PZAttachTwoWeaponsOnBack": "Attach Two Weapons On Back",
+    "Sandbox_PZAttachTwoWeaponsOnBack": "Second Back Slot",
     "Sandbox_ATWOB_RequiredStrength": "Required Strength Level",
     "Sandbox_ATWOB_RequiredStrength_tooltip": "Strength level needed for the second back slot (Back 2).\n0: every character has it from the start.\n1-10: Back 2 shows up on the hotbar when the character reaches that level.\nOnly the level in the Skills panel counts: moodles like hunger, starving or nicotine withdrawal do not change it.\nIf Strength drops below it (after weeks without training it), the slot goes away and its item comes off the back, into the inventory. The slot comes back once Strength is trained back up."
 }

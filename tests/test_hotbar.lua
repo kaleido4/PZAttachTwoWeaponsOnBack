@@ -196,10 +196,10 @@ test("with a Strength requirement, Back 2 shows up at that level", function()
     eq(slotTypes(hotbar), "Back,SmallBeltLeft,SmallBeltRight", "below the level")
     local hammer = chr:addItem(newItem("Hammer"))
     attach(hotbar, hammer, 2)
-    fire("EveryOneMinute")
+    hotbar:update()
     eq(slotTypes(hotbar), "Back,SmallBeltLeft,SmallBeltRight", "still below the level")
     chr.levels.Strength = 5
-    fire("EveryOneMinute")
+    hotbar:update()
     eq(slotTypes(hotbar), "Back,ATWOB_Back2,SmallBeltLeft,SmallBeltRight", "at the level")
     eq(table.concat(chr.modData.hotbar, ","), "Back,ATWOB_Back2,SmallBeltLeft,SmallBeltRight", "saved slots")
     eq(hotbar.attachedItems[3], hammer, "hammer moved to key 3")
@@ -220,7 +220,7 @@ test("when Strength drops below the requirement, Back 2 goes and its item comes 
     attach(hotbar, crowbarItem, BACK2)
     attach(hotbar, hammer, 3)
     chr.levels.Strength = 4
-    fire("EveryOneMinute")
+    hotbar:update()
     eq(slotTypes(hotbar), "Back,SmallBeltLeft,SmallBeltRight", "slots")
     eq(crowbarItem:getAttachedSlot(), -1, "crowbar off the hotbar")
     eq(chr.attached["ATWOB Blade On Back"], nil, "crowbar off the model")
@@ -239,11 +239,11 @@ test("Back 2 comes back when Strength is trained back up to the requirement", fu
     local crowbarItem = crowbar(chr)
     attach(hotbar, crowbarItem, BACK2)
     chr.levels.Strength = 4
-    fire("EveryOneMinute")
+    hotbar:update()
     eq(slotTypes(hotbar), "Back", "after the drop")
     truthy(chr:getInventory():contains(crowbarItem), "crowbar kept in the inventory")
     chr.levels.Strength = 5
-    fire("EveryOneMinute")
+    hotbar:update()
     eq(slotTypes(hotbar), "Back,ATWOB_Back2", "trained back up")
     attach(hotbar, crowbarItem, BACK2)
     eq(hotbar.attachedItems[BACK2], crowbarItem, "crowbar goes on Back 2 again")
@@ -257,10 +257,10 @@ test("the slot does not change during a timed action", function()
     local hotbar = newHotbar(chr)
     chr.levels.Strength = 5
     ISTimedActionQueue.queues[chr] = { queue = { {} } }
-    fire("EveryOneMinute")
+    hotbar:update()
     eq(slotTypes(hotbar), "Back", "during the action")
     ISTimedActionQueue.queues[chr] = nil
-    fire("EveryOneMinute")
+    hotbar:update()
     eq(slotTypes(hotbar), "Back,ATWOB_Back2", "after it")
     requireStrength(0)
 end)

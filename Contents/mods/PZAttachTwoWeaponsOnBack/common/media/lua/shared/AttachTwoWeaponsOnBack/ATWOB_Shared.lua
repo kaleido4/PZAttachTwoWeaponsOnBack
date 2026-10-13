@@ -1,5 +1,5 @@
 --[[
-    Attach Two Weapons On Back: the attached locations for the second back slot.
+    Second Back Slot: the attached locations for the second back slot.
 
     A character holds one item per attached location, so the second back slot
     cannot reuse the vanilla ones: its item would knock the first one off the
@@ -111,7 +111,7 @@ function ATWOB.addModelAttachments()
         end
         if failed then
             -- The slot still works on the vanilla attachment, its item just overlaps the first one.
-            print("AttachTwoWeaponsOnBack: could not add the model attachment " .. id .. ", using " .. attachment)
+            print("Second Back Slot: could not add the model attachment " .. id .. ", using " .. attachment)
             group:getOrCreateLocation(ATWOB.mirrorLocation(location)):setAttachmentName(attachment)
         end
     end

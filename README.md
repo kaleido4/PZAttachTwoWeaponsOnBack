@@ -1,4 +1,4 @@
-# Attach Two Weapons On Back
+# Second Back Slot
 
 Project Zomboid (Build 42) mod that adds a second back slot to the hotbar, so you can carry two weapons on your back, like a shotgun and a crowbar, each on its own hotbar key.
 
@@ -19,7 +19,7 @@ Project Zomboid (Build 42) mod that adds a second back slot to the hotbar, so yo
 |---|---|---|
 | Required Strength Level | 0-10 | 0 |
 
-The Strength level a character needs for Back 2; 0 means every character has it from the start. Strength is the skill that sets how much a character can carry. Only the level in the Skills panel counts (`getPerkLevel`, which both read): moodles like hunger, starving or nicotine withdrawal do not change it. In B42.21 that level only goes down through the XP decay below or debug and admin tools, since `XP.AddXP` takes a level away only when XP drops under the level's threshold, and the decay is the only thing that removes Strength or Fitness XP. The slot shows up when the level is reached and goes away if Strength drops below it: its item then comes off the back and stays in the inventory, and the slot comes back once Strength is trained back up. That is rare: the game only takes Strength XP from a character who has not trained it for about 7 in-game weeks, 1 XP every 20 in-game hours (`XpUpdate.everyTenMinutes`, B42.21). This is checked when the hotbar is made and every in-game minute, but not during a timed action, which may be about to use a slot.
+The Strength level a character needs for Back 2; 0 means every character has it from the start. Strength is the skill that sets how much a character can carry. Only the level in the Skills panel counts (`getPerkLevel`, which both read): moodles like hunger, starving or nicotine withdrawal do not change it. In B42.21 that level only goes down through the XP decay below or debug and admin tools, since `XP.AddXP` takes a level away only when XP drops under the level's threshold, and the decay is the only thing that removes Strength or Fitness XP. The slot shows up when the level is reached and goes away if Strength drops below it: its item then comes off the back and stays in the inventory, and the slot comes back once Strength is trained back up. That is rare: the game only takes Strength XP from a character who has not trained it for about 7 in-game weeks, 1 XP every 20 in-game hours (`XpUpdate.everyTenMinutes`, B42.21). This is checked when the hotbar is made and in its `update()`, which runs every frame, so the slot follows right away. During a timed action, which may be about to use a slot index, it waits until the action is done.
 
 ## How it works
 
