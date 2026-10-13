@@ -219,9 +219,11 @@ test("when Strength drops below the requirement, Back 2 goes and its item comes 
     local hammer = chr:addItem(newItem("Hammer"))
     attach(hotbar, crowbarItem, BACK2)
     attach(hotbar, hammer, 3)
+    ISInventoryPage.renderDirty = false
     chr.levels.Strength = 4
     hotbar:update()
     eq(slotTypes(hotbar), "Back,SmallBeltLeft,SmallBeltRight", "slots")
+    eq(ISInventoryPage.renderDirty, true, "inventory window asked to redraw")
     eq(crowbarItem:getAttachedSlot(), -1, "crowbar off the hotbar")
     eq(chr.attached["ATWOB Blade On Back"], nil, "crowbar off the model")
     truthy(chr:getInventory():contains(crowbarItem), "crowbar still in the inventory")

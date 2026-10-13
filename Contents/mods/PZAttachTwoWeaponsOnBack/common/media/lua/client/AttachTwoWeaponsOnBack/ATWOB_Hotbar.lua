@@ -127,6 +127,9 @@ function ATWOB.removeSlot(hotbar)
             end
         end
     end
+    -- The inventory window lists the item with the equipped ones until it is
+    -- rebuilt; the vanilla detach action asks for that the same way.
+    ISInventoryPage.renderDirty = true
 end
 
 -- Adds or takes away our slot to match the Strength requirement. Returns
