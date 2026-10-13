@@ -11,6 +11,8 @@
         requirement (sandbox), the slot only shows up from that level.
       * update: adds or takes away the slot as soon as Strength crosses the
         requirement while playing.
+      * refresh (wrapped at boot, after other mods): puts items back on their
+        own slots when another hotbar mod mixed up the slot numbers.
       * attachItem / canBeAttached: with a bag on, vanilla moves back items
         beside it, but only for slots named "Back". Ours does the same with the
         mirrored "with Bag" locations.
@@ -202,6 +204,48 @@ function ISHotbar:update()
     end
     return original_update(self)
 end
+
+-- Another hotbar mod can move slots and leave items on the wrong slot number:
+-- vanilla's update then drops every item whose slot cannot hold it. Reorder The
+-- Hotbar does it whenever worn items change, since it only expects "Back" to
+-- stay: it moves Back 2 to the end, then sorts the slots back before matching
+-- the items to them again by their old numbers. The slot type an item saved is
+-- still right, so the items are matched to their slots by type again.
+function ATWOB.healSlots(hotbar)
+    local mixedUp = false
+    for index, item in pairs(hotbar.attachedItems) do
+        local slotType = item:getAttachedSlotType()
+        local slot = hotbar.availableSlot[index]
+        if slotType and not (slot and slot.slotType == slotType) then
+            mixedUp = true
+        end
+    end
+    if not mixedUp then
+        return false
+    end
+    ATWOB.fixAttachedSlots(hotbar)
+    hotbar:reloadIcons()
+    if ReorderTheHotbar_Mod then
+        -- It also keeps each slot's item on the slot, for dragging slots around.
+        for index, slot in pairs(hotbar.availableSlot) do
+            slot.item = hotbar.attachedItems[index]
+        end
+    end
+    return true
+end
+
+-- At boot, once every mod has replaced or wrapped refresh, so this runs after them all.
+Events.OnGameBoot.Add(function()
+    if ATWOB.healInstalled then
+        return
+    end
+    ATWOB.healInstalled = true
+    local original_refresh = ISHotbar.refresh
+    function ISHotbar:refresh()
+        original_refresh(self)
+        ATWOB.healSlots(self)
+    end
+end)
 
 local original_canBeAttached = ISHotbar.canBeAttached
 function ISHotbar:canBeAttached(slot, item)

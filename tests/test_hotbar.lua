@@ -182,6 +182,25 @@ test("a save with the mod loads back the same", function()
     checkModel(hotbar)
 end)
 
+test("items go back to their own slots when another mod mixed up the slot numbers", function()
+    local chr, hotbar = newPlayer()
+    chr:wear(newBelt())
+    clothingUpdated(hotbar)
+    local crowbarItem = crowbar(chr)
+    local hammer = chr:addItem(newItem("Hammer"))
+    attach(hotbar, crowbarItem, BACK2)
+    attach(hotbar, hammer, 3)
+    -- What Reorder The Hotbar leaves behind: the slots in order, the items not.
+    crowbarItem:setAttachedSlot(4)
+    hammer:setAttachedSlot(2)
+    hotbar:reloadIcons()
+    hotbar:refresh()
+    hotbar:update()
+    eq(hotbar.attachedItems[BACK2], crowbarItem, "crowbar on Back 2")
+    eq(hotbar.attachedItems[3], hammer, "hammer on the left belt")
+    checkModel(hotbar)
+end)
+
 local function requireStrength(level)
     SandboxVars.PZAttachTwoWeaponsOnBack.RequiredStrength = level
 end

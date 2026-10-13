@@ -1,4 +1,5 @@
 version=1
+id=3819163031
 title=Second Back Slot - Carry Two Weapons On Your Back
 description=Adds a second back slot to the hotbar, so you can carry two weapons on your back, like a shotgun and a crowbar, each on its own hotbar key.
 description=
@@ -22,5 +23,5 @@ description=Can be added to existing saves. Before removing the mod, take the it
 description=
 description=Does not replace game files.
 description=Build 42.
-tags=Build 42;Interface;Weapons;Multiplayer;QoL
+tags=Build 42;Balance;Interface;Misc;Multiplayer;Realistic;QoL;Weapons
 visibility=public

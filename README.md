@@ -48,7 +48,14 @@ In vanilla a crowbar (`blade_back`, -61 0 0) and a shotgun (`rifle_back`, -49 11
 - **`loadPosition`**: adds "Back 2" after "Back" on a new character, and to saves made without the mod, or takes it away when the character is below the required Strength. Items save both their slot index and their slot type, so the indices of the slots that moved are matched to their type again (and synced in MP). The same happens when the slot comes or goes while playing.
 - **`attachItem` / `canBeAttached`**: vanilla moves back items beside a worn bag only for slots named "Back" (the bag's `AttachmentReplacement`). "Back 2" is not named "Back", or vanilla would use the same bag locations as the first slot. The wrapper does the same move with the mirrored "with Bag" locations, and refuses items that cannot be on the back with a bag (guitars).
 
+- **`refresh`** (wrapped at boot, after every other mod): an item saves both its slot number and its slot type, and vanilla's update drops any item whose slot number points at a slot that cannot hold it. Other hotbar mods can mix the numbers up, so after every refresh, items whose number does not match their slot type are matched to their slots by type again.
+
 The slot's item types are copied from the vanilla back slot at boot, so items other mods add to it work on "Back 2" too, as long as they use a vanilla back location.
+
+### Compatibility
+
+- **Reorder The Hotbar** (workshop 2903771337) replaces `refresh`. Before a full refresh (whenever worn items change, and when loading) it moves every slot except "Back" and the worn items' slots to the end, since those are about to be removed. Back 2 stays, so its `reorderTheHotbar` then sorts the slots back into the player's order, but matches the items to them by their old numbers. With a belt on, the Back 2 item and the belt items then pointed at the wrong slots and came off the hotbar. The `refresh` wrapper above puts them back, and `tests/test_compat.lua` runs that mod's own code when it is installed.
+- **Equipment UI** wraps `refresh` and calls the original, so it works as is.
 
 ## Layout
 
@@ -70,4 +77,4 @@ tests/                                               Kahlua test runner and test
 tests/run_tests.sh
 ```
 
-The tests run on Kahlua from the game's jar and load the vanilla hotbar code (`ISHotbar`, the attach and detach actions, the slot and location definitions) and the body models from the game folder, so they check the mod against the game's own code. Set `PZ_DIR` if the game is not in `D:/Games/Steam/steamapps/common/ProjectZomboid`.
+The tests run on Kahlua from the game's jar and load the vanilla hotbar code (`ISHotbar`, the attach and detach actions, the slot and location definitions) and the body models from the game folder, so they check the mod against the game's own code. `test_compat.lua` also loads other hotbar mods from the Steam Workshop folder next to the game, and skips them when they are not installed. Set `PZ_DIR` if the game is not in `D:/Games/Steam/steamapps/common/ProjectZomboid`.

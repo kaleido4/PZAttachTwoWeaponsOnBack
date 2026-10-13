@@ -270,6 +270,7 @@ function ISPanelJoypad:new(x, y, width, height)
 end
 
 function ISPanelJoypad:setWidth(width) self.width = width end
+function ISPanelJoypad:getWidth() return self.width end
 function ISPanelJoypad:setX(x) self.x = x end
 function ISPanelJoypad:setY(y) self.y = y end
 function ISPanelJoypad:isVisible() return self.visible end

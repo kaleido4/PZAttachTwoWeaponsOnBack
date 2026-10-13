@@ -17,4 +17,5 @@ mkdir -p "$ROOT/build"
 cd "$PZ_DIR"
 ./jre64/bin/java -Droot="$ROOT" -cp "$ROOT/build;projectzomboid.jar" KahluaRunner \
     "$ROOT/tests/test_shared.lua" \
-    "$ROOT/tests/test_hotbar.lua"
+    "$ROOT/tests/test_hotbar.lua" \
+    "$ROOT/tests/test_compat.lua"
