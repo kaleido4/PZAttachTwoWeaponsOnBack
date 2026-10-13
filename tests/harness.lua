@@ -83,6 +83,10 @@ function fire(name, ...)
     for _, fn in ipairs(Events[name].handlers) do fn(...) end
 end
 
+SandboxVars = { PZAttachTwoWeaponsOnBack = {} }
+Perks = { Strength = "Strength" }
+
+function getNumActivePlayers() return 1 end
 function isClient() return false end
 function isServer() return false end
 function getDebug() return false end
@@ -194,6 +198,23 @@ function loadCharacterModels()
         table.insert(scripts, script)
     end
     return scripts
+end
+
+-- Where a model's own axis points once attached: Rx(rx) Ry(ry) Rz(rz) applied
+-- to it, like the game's rotateXYZ (degrees).
+function rotateAxis(rx, ry, rz, axis)
+    local x, y, z = axis[1], axis[2], axis[3]
+    local s, c = math.sin(math.rad(rz)), math.cos(math.rad(rz))
+    x, y = x * c - y * s, x * s + y * c
+    s, c = math.sin(math.rad(ry)), math.cos(math.rad(ry))
+    x, z = x * c + z * s, -x * s + z * c
+    s, c = math.sin(math.rad(rx)), math.cos(math.rad(rx))
+    y, z = y * c - z * s, y * s + z * c
+    return { x, y, z }
+end
+
+function dot(a, b)
+    return a[1] * b[1] + a[2] * b[2] + a[3] * b[3]
 end
 
 function getModelScript(fullType)
@@ -330,8 +351,9 @@ end
 
 function newCharacter()
     local group = AttachedLocations.getGroup("Human")
-    local chr = { modData = {}, worn = {}, items = {}, attached = {}, knockedOff = {} }
+    local chr = { modData = {}, worn = {}, items = {}, attached = {}, knockedOff = {}, levels = {} }
     function chr:getModData() return self.modData end
+    function chr:getPerkLevel(perk) return self.levels[perk] or 0 end
     function chr:transmitModData() end
     function chr:getPlayerNum() return 0 end
     function chr:getVehicle() return nil end

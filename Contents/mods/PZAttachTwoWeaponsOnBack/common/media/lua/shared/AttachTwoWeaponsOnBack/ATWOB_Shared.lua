@@ -47,10 +47,14 @@ end
 -- Mirrors an attachment's offset and rotation across the spine. Left and right
 -- attachments on the body differ by the sign of Y (belt_left/belt_right on the
 -- pelvis, webbing_left/right on the spine, backpack_left on the back bone), so
--- Y points to the side: the mirror flips Y, and with it the rotations about X
--- and Z. The rotation about Y stays.
+-- Y points to the side and the offset flips Y.
+-- A model cannot be mirrored, only turned, so the item keeps its length (its own
+-- Y axis) and width (Z) mirrored and is turned over (its X, the side lying
+-- against the back). The game rotates X, then Y, then Z (rotateXYZ), which makes
+-- that -rx, ry, 180 - rz. The game's own right/left belt attachments follow the
+-- same rule (holster_right 179 -2 86, holster_left 179 -2 94).
 function ATWOB.mirrorTransform(ox, oy, oz, rx, ry, rz)
-    return ox, -oy, oz, -rx, ry, -rz
+    return ox, -oy, oz, -rx, ry, 180 - rz
 end
 
 local group = AttachedLocations.getGroup("Human")
@@ -85,8 +89,11 @@ local function addMirror(script, source, id)
 end
 
 -- Adds the mirrored attachments to the female and male body models, once each,
--- and returns how many it added.
+-- and returns how many it added. Only clients draw the models, so a server skips this.
 function ATWOB.addModelAttachments()
+    if isServer() then
+        return 0
+    end
     local added = 0
     local bodies = getBodyScripts()
     for location, attachment in pairs(ATWOB.BACK_LOCATIONS) do

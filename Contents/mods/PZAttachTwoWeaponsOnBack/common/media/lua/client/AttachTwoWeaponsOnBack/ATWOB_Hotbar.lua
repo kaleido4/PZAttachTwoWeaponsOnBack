@@ -7,7 +7,9 @@
       * haveThisSlot: refresh() drops every slot that is not the back slot or
         one a worn item provides. Ours stays, like the back slot.
       * loadPosition: adds the slot after the back slot (key 2) on a new
-        character, and to saves made without the mod.
+        character, and to saves made without the mod. With a Strength
+        requirement (sandbox), the slot only shows up from that level, checked
+        every in-game minute.
       * attachItem / canBeAttached: with a bag on, vanilla moves back items
         beside it, but only for slots named "Back". Ours does the same with the
         mirrored "with Bag" locations.
@@ -61,18 +63,35 @@ function ATWOB.getLocation(hotbar, item, location)
     return location
 end
 
--- Puts our slot right after the back slot, so it is key 2 on a new character.
--- In a save from before the mod, the slots after it move up one.
-function ATWOB.insertSlot(hotbar)
+-- Sandbox: the Strength level needed for our slot. 0 (the default): everyone has it.
+function ATWOB.getRequiredStrength()
+    local vars = SandboxVars and SandboxVars.PZAttachTwoWeaponsOnBack
+    return vars and vars.RequiredStrength or 0
+end
+
+function ATWOB.isUnlocked(chr)
+    return chr:getPerkLevel(Perks.Strength) >= ATWOB.getRequiredStrength()
+end
+
+local function orderedSlots(hotbar)
     local indices = {}
     for index in pairs(hotbar.availableSlot) do
         table.insert(indices, index)
     end
     table.sort(indices)
-    local ours = { slotType = slotDef.type, name = slotDef.name, def = slotDef }
     local slots = {}
     for _, index in ipairs(indices) do
-        local slot = hotbar.availableSlot[index]
+        table.insert(slots, hotbar.availableSlot[index])
+    end
+    return slots
+end
+
+-- Puts our slot right after the back slot, so it is key 2 on a new character.
+-- In a save from before the mod, the slots after it move up one.
+function ATWOB.insertSlot(hotbar)
+    local ours = { slotType = slotDef.type, name = slotDef.name, def = slotDef }
+    local slots = {}
+    for _, slot in ipairs(orderedSlots(hotbar)) do
         table.insert(slots, slot)
         if ours and slot.slotType == "Back" then
             table.insert(slots, ours)
@@ -85,9 +104,48 @@ function ATWOB.insertSlot(hotbar)
     hotbar.availableSlot = slots
 end
 
+-- Takes our slot away; its item comes off the back and stays in the inventory.
+function ATWOB.removeSlot(hotbar)
+    local slots = {}
+    for _, slot in ipairs(orderedSlots(hotbar)) do
+        if slot.slotType ~= ATWOB.SLOT_TYPE then
+            table.insert(slots, slot)
+        end
+    end
+    hotbar.availableSlot = slots
+    local items = hotbar.chr:getInventory():getItems()
+    for i = 0, items:size() - 1 do
+        local item = items:get(i)
+        if item:getAttachedSlotType() == ATWOB.SLOT_TYPE then
+            hotbar.chr:removeAttachedItem(item)
+            item:setAttachedSlot(-1)
+            item:setAttachedSlotType(nil)
+            item:setAttachedToModel(nil)
+            if isClient() then
+                syncItemFields(hotbar.chr, item)
+            end
+        end
+    end
+end
+
+-- Adds or takes away our slot to match the Strength requirement. Returns
+-- whether it did; the other slots' items then need fixAttachedSlots.
+function ATWOB.updateSlot(hotbar)
+    local unlocked = ATWOB.isUnlocked(hotbar.chr)
+    if unlocked == hotbar:haveThisSlot(ATWOB.SLOT_TYPE) then
+        return false
+    end
+    if unlocked then
+        ATWOB.insertSlot(hotbar)
+    else
+        ATWOB.removeSlot(hotbar)
+    end
+    return true
+end
+
 -- An item saves both its slot index and its slot type. When slots moved, the
--- index is matched to the type again, like refresh() does when slots move
--- while playing.
+-- index is matched to the type again, like refresh() does when worn items move
+-- slots while playing.
 function ATWOB.fixAttachedSlots(hotbar)
     local items = hotbar.chr:getInventory():getItems()
     for i = 0, items:size() - 1 do
@@ -123,11 +181,23 @@ end
 local original_loadPosition = ISHotbar.loadPosition
 function ISHotbar:loadPosition()
     original_loadPosition(self)
-    if not self:haveThisSlot(ATWOB.SLOT_TYPE) then
-        ATWOB.insertSlot(self)
-    end
+    ATWOB.updateSlot(self)
     ATWOB.fixAttachedSlots(self)
 end
+
+-- Strength, and the sandbox option, can change while playing. Not during a
+-- timed action, which may be about to use a slot index.
+Events.EveryOneMinute.Add(function()
+    for playerNum = 0, getNumActivePlayers() - 1 do
+        local hotbar = getPlayerHotbar(playerNum)
+        local queue = hotbar and ISTimedActionQueue.queues[hotbar.chr]
+        if hotbar and not (queue and #queue.queue > 0) and ATWOB.updateSlot(hotbar) then
+            ATWOB.fixAttachedSlots(hotbar)
+            hotbar:reloadIcons()
+            hotbar:savePosition()
+        end
+    end
+end)
 
 local original_canBeAttached = ISHotbar.canBeAttached
 function ISHotbar:canBeAttached(slot, item)

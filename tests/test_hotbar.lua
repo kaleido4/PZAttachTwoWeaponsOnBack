@@ -182,4 +182,114 @@ test("a save with the mod loads back the same", function()
     checkModel(hotbar)
 end)
 
+local function requireStrength(level)
+    SandboxVars.PZAttachTwoWeaponsOnBack.RequiredStrength = level
+end
+
+test("with a Strength requirement, Back 2 shows up at that level", function()
+    requireStrength(5)
+    local chr = newCharacter()
+    chr.levels.Strength = 4
+    local hotbar = newHotbar(chr)
+    chr:wear(newBelt())
+    clothingUpdated(hotbar)
+    eq(slotTypes(hotbar), "Back,SmallBeltLeft,SmallBeltRight", "below the level")
+    local hammer = chr:addItem(newItem("Hammer"))
+    attach(hotbar, hammer, 2)
+    fire("EveryOneMinute")
+    eq(slotTypes(hotbar), "Back,SmallBeltLeft,SmallBeltRight", "still below the level")
+    chr.levels.Strength = 5
+    fire("EveryOneMinute")
+    eq(slotTypes(hotbar), "Back,ATWOB_Back2,SmallBeltLeft,SmallBeltRight", "at the level")
+    eq(table.concat(chr.modData.hotbar, ","), "Back,ATWOB_Back2,SmallBeltLeft,SmallBeltRight", "saved slots")
+    eq(hotbar.attachedItems[3], hammer, "hammer moved to key 3")
+    hotbar:update()
+    checkModel(hotbar)
+    requireStrength(0)
+end)
+
+test("when Strength drops below the requirement, Back 2 goes and its item comes off", function()
+    requireStrength(5)
+    local chr = newCharacter()
+    chr.levels.Strength = 5
+    local hotbar = newHotbar(chr)
+    chr:wear(newBelt())
+    clothingUpdated(hotbar)
+    local crowbarItem = crowbar(chr)
+    local hammer = chr:addItem(newItem("Hammer"))
+    attach(hotbar, crowbarItem, BACK2)
+    attach(hotbar, hammer, 3)
+    chr.levels.Strength = 4
+    fire("EveryOneMinute")
+    eq(slotTypes(hotbar), "Back,SmallBeltLeft,SmallBeltRight", "slots")
+    eq(crowbarItem:getAttachedSlot(), -1, "crowbar off the hotbar")
+    eq(chr.attached["ATWOB Blade On Back"], nil, "crowbar off the model")
+    truthy(chr:getInventory():contains(crowbarItem), "crowbar still in the inventory")
+    eq(hotbar.attachedItems[2], hammer, "hammer back on key 2")
+    hotbar:update()
+    checkModel(hotbar)
+    requireStrength(0)
+end)
+
+test("Back 2 comes back when Strength is trained back up to the requirement", function()
+    requireStrength(5)
+    local chr = newCharacter()
+    chr.levels.Strength = 5
+    local hotbar = newHotbar(chr)
+    local crowbarItem = crowbar(chr)
+    attach(hotbar, crowbarItem, BACK2)
+    chr.levels.Strength = 4
+    fire("EveryOneMinute")
+    eq(slotTypes(hotbar), "Back", "after the drop")
+    truthy(chr:getInventory():contains(crowbarItem), "crowbar kept in the inventory")
+    chr.levels.Strength = 5
+    fire("EveryOneMinute")
+    eq(slotTypes(hotbar), "Back,ATWOB_Back2", "trained back up")
+    attach(hotbar, crowbarItem, BACK2)
+    eq(hotbar.attachedItems[BACK2], crowbarItem, "crowbar goes on Back 2 again")
+    checkModel(hotbar)
+    requireStrength(0)
+end)
+
+test("the slot does not change during a timed action", function()
+    requireStrength(5)
+    local chr = newCharacter()
+    local hotbar = newHotbar(chr)
+    chr.levels.Strength = 5
+    ISTimedActionQueue.queues[chr] = { queue = { {} } }
+    fire("EveryOneMinute")
+    eq(slotTypes(hotbar), "Back", "during the action")
+    ISTimedActionQueue.queues[chr] = nil
+    fire("EveryOneMinute")
+    eq(slotTypes(hotbar), "Back,ATWOB_Back2", "after it")
+    requireStrength(0)
+end)
+
+test("a character saved with Back 2 loads without it when below the requirement", function()
+    requireStrength(5)
+    local chr = newCharacter()
+    chr.levels.Strength = 2
+    chr.modData.hotbar = { "Back", "ATWOB_Back2", "SmallBeltLeft", "SmallBeltRight" }
+    chr:wear(newBelt())
+    local saved = {
+        { newItem("BigBlade", { name = "Crowbar" }), 2, "ATWOB_Back2", "ATWOB Blade On Back" },
+        { newItem("Hammer"), 3, "SmallBeltLeft", "Belt Left" },
+        { newItem("Screwdriver"), 4, "SmallBeltRight", "Belt Right Screwdriver" },
+    }
+    for _, s in ipairs(saved) do
+        local item = chr:addItem(s[1])
+        item:setAttachedSlot(s[2])
+        item:setAttachedSlotType(s[3])
+        item:setAttachedToModel(s[4])
+    end
+    local hotbar = newHotbar(chr)
+    hotbar:update()
+    eq(slotTypes(hotbar), "Back,SmallBeltLeft,SmallBeltRight", "slots")
+    eq(saved[1][1]:getAttachedSlot(), -1, "crowbar off the hotbar")
+    eq(hotbar.attachedItems[2], saved[2][1], "hammer on key 2")
+    eq(hotbar.attachedItems[3], saved[3][1], "screwdriver on key 3")
+    checkModel(hotbar)
+    requireStrength(0)
+end)
+
 finish("ATWOB hotbar")
