@@ -78,6 +78,37 @@ test("the angles of a rotation give the same rotation back", function()
     end
 end)
 
+test("for any rotation, Back 2 mirrors the length and keeps every direction as far out of the back", function()
+    local cases = {}
+    for _, a in ipairs({ 0, 90, -90, 180, 45 }) do
+        for _, b in ipairs({ 0, 90, -90, 89.999, -89.999, 45 }) do
+            for _, c in ipairs({ 0, 90, -90, 180 }) do
+                table.insert(cases, { a, b, c })
+            end
+        end
+    end
+    local seed = 12345
+    for _ = 1, 500 do
+        local angles = {}
+        for i = 1, 3 do
+            seed = (seed * 1103515245 + 12345) % 2147483648
+            angles[i] = seed / 2147483648 * 360 - 180
+        end
+        table.insert(cases, angles)
+    end
+    for _, c in ipairs(cases) do
+        local _, _, _, mx, my, mz = ATWOB.mirrorTransform(0, 0, 0, c[1], c[2], c[3])
+        local what = table.concat(c, " ")
+        for i, axis in ipairs({ { 1, 0, 0 }, { 0, 1, 0 }, { 0, 0, 1 } }) do
+            local before, after = rotateAxis(c[1], c[2], c[3], axis), rotateAxis(mx, my, mz, axis)
+            truthy(math.abs(after[1] - before[1]) < 1e-9, what .. ": direction " .. i .. " out of the back")
+            if i == 2 then
+                truthy(math.abs(after[2] + before[2]) < 1e-9 and math.abs(after[3] - before[3]) < 1e-9, what .. ": length")
+            end
+        end
+    end
+end)
+
 local function axes(attachment)
     local r = attachment:getRotate()
     return {

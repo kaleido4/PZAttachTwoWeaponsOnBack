@@ -56,13 +56,15 @@ function ATWOB.rotation(rx, ry, rz)
     }
 end
 
--- The angles of such a rotation.
+-- The angles of such a rotation. Straight up or down about Y (cos 0), X and Z
+-- turn about the same line, so all of it goes on X.
 function ATWOB.angles(m)
-    local sb = math.max(-1, math.min(1, m[1][3]))
-    if math.abs(sb) < 0.99999 then
-        return math.deg(math.atan2(-m[2][3], m[3][3])), math.deg(math.asin(sb)), math.deg(math.atan2(-m[1][2], m[1][1]))
+    local cb = math.sqrt(m[1][1] * m[1][1] + m[1][2] * m[1][2])
+    local b = math.deg(math.atan2(m[1][3], cb))
+    if cb > 0.000000001 then
+        return math.deg(math.atan2(-m[2][3], m[3][3])), b, math.deg(math.atan2(-m[1][2], m[1][1]))
     end
-    return math.deg(math.atan2(m[3][2], m[2][2])), math.deg(math.asin(sb)), 0
+    return math.deg(math.atan2(m[3][2], m[2][2])), b, 0
 end
 
 -- Mirrors an attachment's offset and rotation across the spine. On the back bone
