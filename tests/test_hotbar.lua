@@ -201,6 +201,18 @@ test("items go back to their own slots when another mod mixed up the slot number
     checkModel(hotbar)
 end)
 
+test("the model a character is drawn with gets the Back 2 attachments, even one set after boot", function()
+    local chr, hotbar = newPlayer()
+    chr.modelScript = copyModelScript("TombBody.FemaleBody", getModelScript("Base.FemaleBody"))
+    hotbar:update()
+    for _, attachment in pairs(ATWOB.BACK_LOCATIONS) do
+        truthy(chr.modelScript:getAttachmentById(ATWOB.mirrorAttachment(attachment)), attachment)
+    end
+    eq(chr.modelResets, 1, "model rebuilt once")
+    hotbar:update()
+    eq(chr.modelResets, 1, "checked once")
+end)
+
 local function requireStrength(level)
     SandboxVars.PZAttachTwoWeaponsOnBack.RequiredStrength = level
 end

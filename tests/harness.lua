@@ -145,7 +145,11 @@ function ModelAttachment.new(id)
     local a = { id = id, offset = vector(0, 0, 0), rotate = vector(0, 0, 0), scale = 1, zOffset = 0 }
     function a:getId() return self.id end
     function a:getBone() return self.bone end
-    function a:setBone(bone) self.bone = bone end
+    function a:setBone(bone)
+        -- Like the game: ModelAttachment.setBone trims the name.
+        if bone == nil then error("Cannot invoke \"String.trim()\" because \"bone\" is null") end
+        self.bone = bone
+    end
     function a:getOffset() return self.offset end
     function a:getRotate() return self.rotate end
     function a:getScale() return self.scale end
@@ -168,6 +172,23 @@ function newModelScript(fullType)
         table.insert(self.attachments, a)
         return a
     end
+    function s:getAttachmentCount() return #self.attachments end
+    function s:getAttachment(i) return self.attachments[i + 1] end
+    return s
+end
+
+-- A body mod's own model: a copy of a vanilla body's attachments, moved a bit.
+function copyModelScript(fullType, from, shift)
+    local s = newModelScript(fullType)
+    for _, a in ipairs(from.attachments) do
+        if not string.find(a:getId(), "^atwob_") then
+            local copy = ModelAttachment.new(a:getId())
+            copy:setBone(a:getBone())
+            copy:getOffset():set(a:getOffset():x() + (shift or 0), a:getOffset():y(), a:getOffset():z())
+            copy:getRotate():set(a:getRotate():x(), a:getRotate():y(), a:getRotate():z())
+            table.insert(s.attachments, copy)
+        end
+    end
     return s
 end
 
@@ -182,8 +203,13 @@ local VECTOR = NUMBER .. "%s+" .. NUMBER .. "%s+" .. NUMBER
 
 -- The character models with their attachments, read from the game's script file.
 function loadCharacterModels()
+    return loadModels("media/scripts/generated/models_characters.txt")
+end
+
+-- The models in one of the game's model script files, with their attachments.
+function loadModels(path)
     local scripts = {}
-    local text = readfile("media/scripts/generated/models_characters.txt")
+    local text = readfile(path)
     for name, body in string.gmatch(text, "model%s+([%w_]+)%s*(%b{})") do
         local script = newModelScript("Base." .. name)
         for id, block in string.gmatch(body, "attachment%s+([%w_]+)%s*(%b{})") do
@@ -192,7 +218,8 @@ function loadCharacterModels()
             local rx, ry, rz = string.match(block, "rotate%s*=%s*" .. VECTOR)
             if ox then a:getOffset():set(tonumber(ox), tonumber(oy), tonumber(oz)) end
             if rx then a:getRotate():set(tonumber(rx), tonumber(ry), tonumber(rz)) end
-            a:setBone(string.match(block, "bone%s*=%s*([%w_]+)"))
+            local bone = string.match(block, "bone%s*=%s*([%w_]+)")
+            if bone then a:setBone(bone) end
             table.insert(script.attachments, a)
         end
         table.insert(scripts, script)
@@ -355,6 +382,13 @@ function newCharacter()
     local chr = { modData = {}, worn = {}, items = {}, attached = {}, knockedOff = {}, levels = {} }
     function chr:getModData() return self.modData end
     function chr:getPerkLevel(perk) return self.levels[perk] or 0 end
+    -- The model the character is drawn with (none unless a test sets one).
+    chr.modelResets = 0
+    function chr:getHumanVisual()
+        local owner = self
+        return { getModelScript = function() return owner.modelScript end }
+    end
+    function chr:resetModelNextFrame() self.modelResets = self.modelResets + 1 end
     function chr:transmitModData() end
     function chr:getPlayerNum() return 0 end
     function chr:getVehicle() return nil end

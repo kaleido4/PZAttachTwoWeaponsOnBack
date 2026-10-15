@@ -44,17 +44,71 @@ function ATWOB.mirrorAttachment(attachment)
     return "atwob_" .. attachment
 end
 
--- Mirrors an attachment's offset and rotation across the spine. Left and right
--- attachments on the body differ by the sign of Y (belt_left/belt_right on the
--- pelvis, webbing_left/right on the spine, backpack_left on the back bone), so
--- Y points to the side and the offset flips Y.
--- A model cannot be mirrored, only turned, so the item keeps its length (its own
--- Y axis) and width (Z) mirrored and is turned over (its X, the side lying
--- against the back). The game rotates X, then Y, then Z (rotateXYZ), which makes
--- that -rx, ry, 180 - rz. The game's own right/left belt attachments follow the
--- same rule (holster_right 179 -2 86, holster_left 179 -2 94).
+-- The rotation the game makes of an attachment's angles (rotateXYZ: X, then Y,
+-- then Z, in degrees), as rows.
+function ATWOB.rotation(rx, ry, rz)
+    local a, b, c = math.rad(rx), math.rad(ry), math.rad(rz)
+    local ca, sa, cb, sb, cc, sc = math.cos(a), math.sin(a), math.cos(b), math.sin(b), math.cos(c), math.sin(c)
+    return {
+        { cb * cc, -cb * sc, sb },
+        { ca * sc + sa * sb * cc, ca * cc - sa * sb * sc, -sa * cb },
+        { sa * sc - ca * sb * cc, sa * cc + ca * sb * sc, ca * cb },
+    }
+end
+
+-- The angles of such a rotation.
+function ATWOB.angles(m)
+    local sb = math.max(-1, math.min(1, m[1][3]))
+    if math.abs(sb) < 0.99999 then
+        return math.deg(math.atan2(-m[2][3], m[3][3])), math.deg(math.asin(sb)), math.deg(math.atan2(-m[1][2], m[1][1]))
+    end
+    return math.deg(math.atan2(m[3][2], m[2][2])), math.deg(math.asin(sb)), 0
+end
+
+-- Mirrors an attachment's offset and rotation across the spine. On the back bone
+-- (Bip01_BackPack) X points out of the back, Y to the side (left and right
+-- attachments on the body differ by the sign of Y: belt_left/belt_right on the
+-- pelvis, backpack_left on the back bone) and Z up, so the offset flips Y.
+-- A model cannot be mirrored, only turned, so the item is turned over across
+-- one of its own directions as well. The one picked runs across the item's
+-- length (its own Y, which is along the item: a crowbar pointed up from the bag
+-- when that was flipped) and lies in the back: then every part of the item stays
+-- just as far out of the back as on the first back slot, and its length is
+-- mirrored. Turning it over across its X instead, which points out of the back,
+-- put whatever stands out from the back into the body: a pan came out of the
+-- chest.
 function ATWOB.mirrorTransform(ox, oy, oz, rx, ry, rz)
-    return ox, -oy, oz, -rx, ry, 180 - rz
+    local r = ATWOB.rotation(rx, ry, rz)
+    -- Out of the back, in the item's directions, is the first row; the one to
+    -- turn over across is square to it and to the item's Y.
+    local nx, nz = r[1][3], -r[1][1]
+    local length = math.sqrt(nx * nx + nz * nz)
+    if length < 0.000001 then
+        nx, nz, length = 1, 0, 1
+    end
+    nx, nz = nx / length, nz / length
+    local turn = { { 1 - 2 * nx * nx, 0, -2 * nx * nz }, { 0, 1, 0 }, { -2 * nz * nx, 0, 1 - 2 * nz * nz } }
+    local side = { 1, -1, 1 }
+    local m = {}
+    for i = 1, 3 do
+        m[i] = {}
+        for j = 1, 3 do
+            m[i][j] = side[i] * (r[i][1] * turn[1][j] + r[i][2] * turn[2][j] + r[i][3] * turn[3][j])
+        end
+    end
+    local mx, my, mz = ATWOB.angles(m)
+    return ox, -oy, oz, mx, my, mz
+end
+
+-- An item model can have an attachment named like the body's, which places the
+-- item at it (the game looks for the location's attachment name on both models,
+-- AttachedModelNames.initFrom); in vanilla only FryingPanForged has them. The
+-- item is drawn at bone x body attachment x inverse of item attachment x mesh
+-- (AnimatedModelInstanceRenderData.transformToParent). The item's one is copied
+-- as is: the body one already mirrors the item and keeps every part of it as
+-- far out of the back (see above), whatever the item attachment does after it.
+function ATWOB.mirrorItemTransform(ox, oy, oz, rx, ry, rz)
+    return ox, oy, oz, rx, ry, rz
 end
 
 local group = AttachedLocations.getGroup("Human")
@@ -63,24 +117,24 @@ for location, attachment in pairs(ATWOB.BACK_LOCATIONS) do
     group:getOrCreateLocation(ATWOB.mirrorLocation(location)):setAttachmentName(ATWOB.mirrorAttachment(attachment))
 end
 
-local function getBodyScripts()
-    local bodies = {}
-    local scripts = getScriptManager():getAllModelScripts()
-    for i = 0, scripts:size() - 1 do
-        local script = scripts:get(i)
-        local fullType = script:getFullType()
-        if fullType == "Base.FemaleBody" or fullType == "Base.MaleBody" then
-            table.insert(bodies, script)
-        end
-    end
-    return bodies
+-- The location of each vanilla back attachment.
+local locationOf = {}
+for location, attachment in pairs(ATWOB.BACK_LOCATIONS) do
+    locationOf[attachment] = location
 end
 
+local VANILLA_BODIES = { ["Base.FemaleBody"] = true, ["Base.MaleBody"] = true }
+
+-- Body attachments are on a bone; an item model's are not.
 local function addMirror(script, source, id)
+    local bone = source:getBone()
+    local mirror = bone and ATWOB.mirrorTransform or ATWOB.mirrorItemTransform
     local offset, rotate = source:getOffset(), source:getRotate()
-    local ox, oy, oz, rx, ry, rz = ATWOB.mirrorTransform(offset:x(), offset:y(), offset:z(), rotate:x(), rotate:y(), rotate:z())
+    local ox, oy, oz, rx, ry, rz = mirror(offset:x(), offset:y(), offset:z(), rotate:x(), rotate:y(), rotate:z())
     local attachment = ModelAttachment.new(id)
-    attachment:setBone(source:getBone())
+    if bone then
+        attachment:setBone(bone)
+    end
     attachment:getOffset():set(ox, oy, oz)
     attachment:getRotate():set(rx, ry, rz)
     attachment:setScale(source:getScale())
@@ -88,32 +142,53 @@ local function addMirror(script, source, id)
     script:addAttachment(attachment)
 end
 
--- Adds the mirrored attachments to the female and male body models, once each,
--- and returns how many it added. Only clients draw the models, so a server skips this.
+-- Adds the mirror of each vanilla back attachment a model has, once, and
+-- returns how many it added.
+function ATWOB.addMirrors(script)
+    local sources = {}
+    for i = 0, script:getAttachmentCount() - 1 do
+        local attachment = script:getAttachment(i)
+        if locationOf[attachment:getId()] then
+            table.insert(sources, attachment)
+        end
+    end
+    local added, isBody = 0, false
+    for _, source in ipairs(sources) do
+        local attachment = source:getId()
+        local id = ATWOB.mirrorAttachment(attachment)
+        isBody = isBody or source:getBone() ~= nil
+        if not script:getAttachmentById(id) then
+            if pcall(addMirror, script, source, id) then
+                added = added + 1
+            elseif source:getBone() then
+                -- The slot still works on the vanilla attachment, its item just overlaps the first one.
+                print("Second Back Slot: could not add the model attachment " .. id .. ", using " .. attachment)
+                group:getOrCreateLocation(ATWOB.mirrorLocation(locationOf[attachment])):setAttachmentName(attachment)
+            end
+        end
+    end
+    if added > 0 and not VANILLA_BODIES[script:getFullType()] then
+        print("Second Back Slot: added the Back 2 attachments to the " .. (isBody and "body" or "item")
+            .. " model " .. script:getFullType())
+    end
+    return added
+end
+
+-- Adds the mirrored attachments to every model with the vanilla back
+-- attachments, and returns how many it added. Those are the vanilla bodies, the
+-- ones a body mod draws characters with instead (HumanVisual's
+-- forceModelScript), and item models placed by them. Without them, a Back 2
+-- item has no attachment on the body and is drawn at the model's root, between
+-- the legs, or misses its own placement. Only clients draw the models, so a
+-- server skips this.
 function ATWOB.addModelAttachments()
     if isServer() then
         return 0
     end
     local added = 0
-    local bodies = getBodyScripts()
-    for location, attachment in pairs(ATWOB.BACK_LOCATIONS) do
-        local id = ATWOB.mirrorAttachment(attachment)
-        local failed = false
-        for _, script in ipairs(bodies) do
-            local source = script:getAttachmentById(attachment)
-            if source and not script:getAttachmentById(id) then
-                if pcall(addMirror, script, source, id) then
-                    added = added + 1
-                else
-                    failed = true
-                end
-            end
-        end
-        if failed then
-            -- The slot still works on the vanilla attachment, its item just overlaps the first one.
-            print("Second Back Slot: could not add the model attachment " .. id .. ", using " .. attachment)
-            group:getOrCreateLocation(ATWOB.mirrorLocation(location)):setAttachmentName(attachment)
-        end
+    local scripts = getScriptManager():getAllModelScripts()
+    for i = 0, scripts:size() - 1 do
+        added = added + ATWOB.addMirrors(scripts:get(i))
     end
     return added
 end

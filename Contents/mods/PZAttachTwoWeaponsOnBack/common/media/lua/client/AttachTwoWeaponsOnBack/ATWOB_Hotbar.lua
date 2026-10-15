@@ -10,7 +10,8 @@
         character, and to saves made without the mod. With a Strength
         requirement (sandbox), the slot only shows up from that level.
       * update: adds or takes away the slot as soon as Strength crosses the
-        requirement while playing.
+        requirement while playing, and makes sure the model the character is
+        drawn with has the Back 2 attachments.
       * refresh (wrapped at boot, after other mods): puts items back on their
         own slots when another hotbar mod mixed up the slot numbers.
       * attachItem / canBeAttached: with a bag on, vanilla moves back items
@@ -191,11 +192,27 @@ function ISHotbar:loadPosition()
     ATWOB.fixAttachedSlots(self)
 end
 
+-- The model the character is drawn with needs the Back 2 attachments: a body
+-- mod can draw characters with its own model (HumanVisual:setForceModelScript),
+-- and scripts can be loaded again after boot. Each model is checked once.
+local checkedModels = {}
+function ATWOB.checkModel(chr)
+    local visual = chr.getHumanVisual and chr:getHumanVisual()
+    local script = visual and visual:getModelScript()
+    if script and not checkedModels[script] then
+        checkedModels[script] = true
+        if ATWOB.addMirrors(script) > 0 then
+            chr:resetModelNextFrame()
+        end
+    end
+end
+
 -- Strength, and the sandbox option, can change while playing: the slot follows
 -- on the next frame, where vanilla also drops hotbar items that no longer fit.
 -- Not during a timed action, which may be about to use a slot index.
 local original_update = ISHotbar.update
 function ISHotbar:update()
+    ATWOB.checkModel(self.chr)
     local queue = ISTimedActionQueue.queues[self.chr]
     if not (queue and #queue.queue > 0) and ATWOB.updateSlot(self) then
         ATWOB.fixAttachedSlots(self)

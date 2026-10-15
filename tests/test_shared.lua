@@ -64,9 +64,16 @@ test("the mirrored attachments are added to both bodies, flipped across the spin
             near(mirror:getOffset():x(), source:getOffset():x(), what .. " offset x")
             near(mirror:getOffset():y(), -source:getOffset():y(), what .. " offset y")
             near(mirror:getOffset():z(), source:getOffset():z(), what .. " offset z")
-            near(mirror:getRotate():x(), -source:getRotate():x(), what .. " rotate x")
-            near(mirror:getRotate():y(), source:getRotate():y(), what .. " rotate y")
-            near(mirror:getRotate():z(), 180 - source:getRotate():z(), what .. " rotate z")
+        end
+    end
+end)
+
+test("the angles of a rotation give the same rotation back", function()
+    for _, angles in ipairs({ { -49, 11, 0 }, { 113, -5, -173 }, { 8, 85, 100 }, { 30, 90, -40 }, { 170, -89.99, 15 } }) do
+        local back = { ATWOB.angles(ATWOB.rotation(angles[1], angles[2], angles[3])) }
+        for _, axis in ipairs({ { 1, 0, 0 }, { 0, 1, 0 }, { 0, 0, 1 } }) do
+            near(dot(rotateAxis(back[1], back[2], back[3], axis), rotateAxis(angles[1], angles[2], angles[3], axis)), 1,
+                table.concat(angles, " "))
         end
     end
 end)
@@ -84,7 +91,7 @@ local function mirrored(v)
     return { v[1], -v[2], v[3] }
 end
 
-test("an item on Back 2 keeps its length and width mirrored, and is turned over", function()
+test("an item on Back 2 has its length mirrored, and every part of it as far out of the back", function()
     for _, body in ipairs(BODIES) do
         local script = getModelScript(body)
         for _, attachment in pairs(ATWOB.BACK_LOCATIONS) do
@@ -92,39 +99,24 @@ test("an item on Back 2 keeps its length and width mirrored, and is turned over"
             local source = axes(script:getAttachmentById(attachment))
             local mirror = axes(script:getAttachmentById(ATWOB.mirrorAttachment(attachment)))
             near(dot(mirror[2], mirrored(source[2])), 1, what .. " length (Y)")
-            near(dot(mirror[3], mirrored(source[3])), 1, what .. " width (Z)")
-            near(dot(mirror[1], mirrored(source[1])), -1, what .. " side against the back (X)")
-        end
-    end
-end)
-
-test("mirroring the game's right belt attachments gives its left ones", function()
-    local close = math.cos(math.rad(20))
-    for _, body in ipairs(BODIES) do
-        local script = getModelScript(body)
-        for _, name in ipairs({ "holster", "nightstick", "meatcleaver", "wrench" }) do
-            local right = script:getAttachmentById(name .. "_right")
-            local left = script:getAttachmentById(name .. "_left")
-            local o, r = right:getOffset(), right:getRotate()
-            local ox, oy, oz, rx, ry, rz = ATWOB.mirrorTransform(o:x(), o:y(), o:z(), r:x(), r:y(), r:z())
-            local what = body .. " " .. name
-            truthy(math.abs(oy - left:getOffset():y()) < 0.03, what .. " offset y " .. oy .. " vs " .. left:getOffset():y())
-            local leftAxes = axes(left)
-            for i, axis in ipairs({ { 1, 0, 0 }, { 0, 1, 0 }, { 0, 0, 1 } }) do
-                local d = dot(rotateAxis(rx, ry, rz, axis), leftAxes[i])
-                truthy(d > close, what .. " axis " .. i .. " within 20 degrees (cos " .. d .. ")")
+            -- Out of the back is X on the back bone: none of the item's directions
+            -- may go further in or out, or the item goes into the body.
+            for i = 1, 3 do
+                near(mirror[i][1], source[i][1], what .. " direction " .. i .. " out of the back")
             end
         end
     end
 end)
 
 test("a rifle on Back 2 goes over the other shoulder", function()
-    -- MaleBody rifle_back: offset 0.008 -0.102 0.061, rotate -49 11 0
+    -- MaleBody rifle_back: offset 0.008 -0.102 0.061, rotate -49 11 0: along the
+    -- back from the right side down to the left (Y points to the left).
+    local source = axes(getModelScript("Base.MaleBody"):getAttachmentById("rifle_back"))[2]
     local mirror = getModelScript("Base.MaleBody"):getAttachmentById("atwob_rifle_back")
     near(mirror:getOffset():y(), 0.102, "offset y")
-    near(mirror:getRotate():x(), 49, "rotate x")
-    near(mirror:getRotate():y(), 11, "rotate y")
-    near(mirror:getRotate():z(), 180, "rotate z")
+    local length = axes(mirror)[2]
+    truthy(source[2] > 0.5 and length[2] < -0.5, "points the other way across the back")
+    near(length[3], source[3], "as far down")
     eq(mirror:getBone(), "Bip01_BackPack", "bone")
 end)
 
@@ -141,6 +133,92 @@ end)
 
 test("adding them again adds nothing", function()
     eq(ATWOB.addModelAttachments(), 0, "added")
+end)
+
+test("a body mod's own model gets the Back 2 attachments too, mirrored from its own", function()
+    -- Like a body mod drawing characters with its own model (setForceModelScript),
+    -- which carries the vanilla back attachments, moved to fit its mesh.
+    local body = copyModelScript("TombBody.MaleBody", getModelScript("Base.MaleBody"), 0.01)
+    local axe = newModelScript("Base.Axe")
+    axe:addAttachment(ModelAttachment.new("world"))
+    table.insert(MODEL_SCRIPTS, body)
+    table.insert(MODEL_SCRIPTS, axe)
+    eq(ATWOB.addModelAttachments(), count(ATWOB.BACK_LOCATIONS), "added, to the body mod's model only")
+    for _, attachment in pairs(ATWOB.BACK_LOCATIONS) do
+        local source = body:getAttachmentById(attachment)
+        local mirror = body:getAttachmentById(ATWOB.mirrorAttachment(attachment))
+        truthy(mirror, attachment)
+        near(mirror:getOffset():x(), source:getOffset():x(), attachment .. " offset x, from the body mod's own")
+        near(mirror:getOffset():y(), -source:getOffset():y(), attachment .. " offset y")
+    end
+    eq(axe:getAttachmentCount(), 1, "item models are left alone")
+end)
+
+-- Transforms as {R = columns, t = offset}: what an attachment does to its model.
+local function transform(a)
+    local r = a:getRotate()
+    return {
+        R = { rotateAxis(r:x(), r:y(), r:z(), { 1, 0, 0 }), rotateAxis(r:x(), r:y(), r:z(), { 0, 1, 0 }), rotateAxis(r:x(), r:y(), r:z(), { 0, 0, 1 }) },
+        t = { a:getOffset():x(), a:getOffset():y(), a:getOffset():z() },
+    }
+end
+
+local function apply(R, v)
+    return { R[1][1] * v[1] + R[2][1] * v[2] + R[3][1] * v[3],
+             R[1][2] * v[1] + R[2][2] * v[2] + R[3][2] * v[3],
+             R[1][3] * v[1] + R[2][3] * v[2] + R[3][3] * v[3] }
+end
+
+local function compose(A, B)
+    local t = apply(A.R, B.t)
+    return { R = { apply(A.R, B.R[1]), apply(A.R, B.R[2]), apply(A.R, B.R[3]) },
+             t = { t[1] + A.t[1], t[2] + A.t[2], t[3] + A.t[3] } }
+end
+
+local function inverse(A)
+    local RT = { { A.R[1][1], A.R[2][1], A.R[3][1] }, { A.R[1][2], A.R[2][2], A.R[3][2] }, { A.R[1][3], A.R[2][3], A.R[3][3] } }
+    local t = apply(RT, A.t)
+    return { R = RT, t = { -t[1], -t[2], -t[3] } }
+end
+
+local function at(A, v)
+    local p = apply(A.R, v)
+    return { p[1] + A.t[1], p[2] + A.t[2], p[3] + A.t[3] }
+end
+
+test("the forged frying pan gets a Back 2 version of its own placement, with no bone", function()
+    local pan = loadModels("media/scripts/generated/models_weapons.txt")
+    for _, script in ipairs(pan) do
+        if script:getFullType() == "Base.FryingPanForged" then pan = script end
+    end
+    table.insert(MODEL_SCRIPTS, pan)
+    eq(ATWOB.addModelAttachments(), 2, "added, to the pan's two back attachments")
+    local mirror = pan:getAttachmentById("atwob_fryingpan_back")
+    truthy(mirror, "atwob_fryingpan_back")
+    eq(mirror:getBone(), nil, "bone")
+    near(mirror:getRotate():y(), 90, "rotate y, copied")
+    eq(group:getLocation("ATWOB Pan On Back"):getAttachmentName(), "atwob_fryingpan_back", "location still on its own attachment")
+end)
+
+test("an item with its own placement has every part of it as far out of the back on Back 2", function()
+    -- A placement like a weapon mod's (the pan's is only a turn about Y).
+    local item = newModelScript("SomeMod.Rifle")
+    local own = item:addAttachment(ModelAttachment.new("rifle_back"))
+    own:getOffset():set(0.03, -0.02, 0.05)
+    own:getRotate():set(10, 20, 30)
+    table.insert(MODEL_SCRIPTS, item)
+    ATWOB.addModelAttachments()
+    for _, body in ipairs(BODIES) do
+        local script = getModelScript(body)
+        -- The game draws the item at body attachment x inverse of item attachment (then the mesh).
+        local back = compose(transform(script:getAttachmentById("rifle_back")), inverse(transform(own)))
+        local back2 = compose(transform(script:getAttachmentById("atwob_rifle_back")),
+            inverse(transform(item:getAttachmentById("atwob_rifle_back"))))
+        -- Points of a pan-sized item, standing out from where it is held.
+        for _, point in ipairs({ { 0, 0, 0 }, { 0.2, 0, 0 }, { 0, 0.3, 0 }, { 0, 0, 0.2 }, { 0.1, -0.15, 0.12 } }) do
+            near(at(back2, point)[1], at(back, point)[1], body .. " point " .. table.concat(point, " ") .. " out of the back")
+        end
+    end
 end)
 
 test("adding them to reloaded scripts adds them again", function()
