@@ -1,0 +1,7 @@
+name=ATWOB Test Bag (testing only)
+id=ATWOBTestBag
+author=kaleido4
+modversion=1.0
+versionMin=42.0.0
+description=Test only, for Second Back Slot. With any backpack on, rifles and shotguns go on a spot of this mod's own, 10 cm further out than the vanilla one, like some backpack mods do. <LINE>
+description=A rifle on Back 2 should then hang on the same spot on the other side of the bag.

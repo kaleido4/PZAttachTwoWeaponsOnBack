@@ -55,7 +55,11 @@ In vanilla a crowbar (`blade_back`, -61 0 0) and a shotgun (`rifle_back`, -49 11
 
 - **`refresh`** (wrapped at boot, after every other mod): an item saves both its slot number and its slot type, and vanilla's update drops any item whose slot number points at a slot that cannot hold it. Other hotbar mods can mix the numbers up, so after every refresh, items whose number does not match their slot type are matched to their slots by type again.
 
-The slot's item types are copied from the vanilla back slot at boot, so items other mods add to it work on "Back 2" too, as long as they use a vanilla back location.
+The slot's item types are copied from the vanilla back slot at boot, so items other mods add to it work on "Back 2" too, as long as their location's attachment is on the back bone (`Bip01_BackPack`, which the mirror is made for).
+
+At boot every attached location gets a twin, on the server and the clients alike (`ATWOB.addTwinLocations`), not only the vanilla back ones: only the hotbar knows which locations a bag uses, and the server must know every location an item is attached to. Twins whose attachment is on the back bone get mirrored model attachments; the others stay unused.
+
+With a bag on, "Back 2" takes the twin of the location the bag puts the item on for "Back" (`hotbar.replacements`). Backpack mods can bring their own locations for that, with their own attachments; when one has no mirror (not on the back bone), "Back 2" uses the mirror of the vanilla bag's location instead, so the item still goes on the other side of the bag. Before 1.0.3 only the vanilla bag locations had a twin, so with such a bag "Back 2" fell back to its location without a bag, diagonally behind the bag, and the part of it that showed was on the same side as the "Back" item.
 
 ### Compatibility
 
@@ -82,4 +86,6 @@ tests/                                               Kahlua test runner and test
 tests/run_tests.sh
 ```
 
-The tests run on Kahlua from the game's jar and load the vanilla hotbar code (`ISHotbar`, the attach and detach actions, the slot and location definitions) and the body models from the game folder, so they check the mod against the game's own code. `test_compat.lua` also loads other hotbar mods from the Steam Workshop folder next to the game, and skips them when they are not installed. Set `PZ_DIR` if the game is not in `D:/Games/Steam/steamapps/common/ProjectZomboid`.
+The tests run on Kahlua from the game's jar and load the vanilla hotbar code (`ISHotbar`, the attach and detach actions, the slot and location definitions) and the body models from the game folder, so they check the mod against the game's own code. `test_compat.lua` also loads other hotbar mods from the Steam Workshop folder next to the game, and skips them when they are not installed.
+
+`tests/ingame/ATWOBTestBag` is a mod for trying a backpack mod's own spots in game: with any backpack on, it puts rifles and shotguns on a spot of its own, 10 cm further out than vanilla's. Link or copy it into `Zomboid/mods`, enable it with this mod, and a rifle on "Back 2" should hang on the same spot on the other side of the bag. Leave it off otherwise. Set `PZ_DIR` if the game is not in `D:/Games/Steam/steamapps/common/ProjectZomboid`.

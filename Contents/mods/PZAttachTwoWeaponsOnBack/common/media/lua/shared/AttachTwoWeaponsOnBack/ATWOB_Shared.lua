@@ -9,6 +9,7 @@
     Each new location points at a new model attachment that mirrors the vanilla
     one across the spine, so the two items cross on the back instead of
     overlapping (in vanilla a shotgun and a crowbar sit at almost the same angle).
+    Other mods' locations, like a backpack mod's own spots, get twins at boot too.
 --]]
 
 ATWOB = ATWOB or {}
@@ -113,16 +114,80 @@ function ATWOB.mirrorItemTransform(ox, oy, oz, rx, ry, rz)
     return ox, oy, oz, rx, ry, rz
 end
 
+-- The bone the back attachments are on, which the mirror above is made for.
+ATWOB.BACK_BONE = "Bip01_BackPack"
+
+-- Where the vanilla bag moves each back item (ISHotbarAttachDefinition.replacements,
+-- "Bag"); "null": not on the back with a bag.
+ATWOB.VANILLA_BAG = {
+    BigWeapon = "Big Weapon On Back with Bag",
+    BigBlade = "Big Blade On Back with Bag",
+    Racket = "Racket Back with Bag",
+    Shovel = "Shovel Back with Bag",
+    Guitar = "null",
+    GuitarAcoustic = "null",
+    Pan = "Pan On Back with Bag",
+    Rifle = "Rifle On Back with Bag",
+    Saucepan = "Saucepan Back with Bag",
+    Sword = "Big Blade On Back with Bag",
+}
+
 local group = AttachedLocations.getGroup("Human")
 
-for location, attachment in pairs(ATWOB.BACK_LOCATIONS) do
-    group:getOrCreateLocation(ATWOB.mirrorLocation(location)):setAttachmentName(ATWOB.mirrorAttachment(attachment))
+-- The locations of each attachment that has a twin.
+local locationsOf = {}
+
+local function addTwin(location, attachment)
+    local twin = ATWOB.mirrorLocation(location)
+    if not group:getLocation(twin) then
+        group:getOrCreateLocation(twin):setAttachmentName(ATWOB.mirrorAttachment(attachment))
+    end
+    locationsOf[attachment] = locationsOf[attachment] or {}
+    locationsOf[attachment][location] = true
 end
 
--- The location of each vanilla back attachment.
-local locationOf = {}
 for location, attachment in pairs(ATWOB.BACK_LOCATIONS) do
-    locationOf[attachment] = location
+    addTwin(location, attachment)
+end
+
+-- Twins for the locations other mods add, like a backpack mod's own spots for
+-- the back items. Every location gets one, at boot on both sides alike: only
+-- the hotbar knows which ones a bag uses, and the server must know every
+-- location an item is attached to.
+function ATWOB.addTwinLocations()
+    for i = 0, group:size() - 1 do
+        local location = group:getLocationByIndex(i)
+        local id, attachment = location:getId(), location:getAttachmentName()
+        if attachment and attachment ~= "" and string.sub(id, 1, 6) ~= "ATWOB " then
+            addTwin(id, attachment)
+        end
+    end
+end
+
+-- The attachments whose mirror is on the bodies, so their twin locations can be used.
+ATWOB.mirrored = {}
+
+-- The Back 2 twin of a location, when there is one and its attachment has a mirror.
+function ATWOB.usableTwin(location)
+    local original = group:getLocation(location)
+    local twin = ATWOB.mirrorLocation(location)
+    if original and ATWOB.mirrored[original:getAttachmentName()] and group:getLocation(twin) then
+        return twin
+    end
+    return nil
+end
+
+-- Attachments with a twin that are on a body's back bone. Only those are
+-- mirrored, on bodies, and on item models that have one with the same name.
+local backIds = {}
+
+local function noteBackIds(script)
+    for i = 0, script:getAttachmentCount() - 1 do
+        local attachment = script:getAttachment(i)
+        if locationsOf[attachment:getId()] and attachment:getBone() == ATWOB.BACK_BONE then
+            backIds[attachment:getId()] = true
+        end
+    end
 end
 
 local VANILLA_BODIES = { ["Base.FemaleBody"] = true, ["Base.MaleBody"] = true }
@@ -144,13 +209,15 @@ local function addMirror(script, source, id)
     script:addAttachment(attachment)
 end
 
--- Adds the mirror of each vanilla back attachment a model has, once, and
--- returns how many it added.
+-- Adds the mirror of each back attachment a model has, once, and returns how
+-- many it added.
 function ATWOB.addMirrors(script)
+    noteBackIds(script)
     local sources = {}
     for i = 0, script:getAttachmentCount() - 1 do
         local attachment = script:getAttachment(i)
-        if locationOf[attachment:getId()] then
+        local bone = attachment:getBone()
+        if backIds[attachment:getId()] and (bone == ATWOB.BACK_BONE or bone == nil) then
             table.insert(sources, attachment)
         end
     end
@@ -158,15 +225,20 @@ function ATWOB.addMirrors(script)
     for _, source in ipairs(sources) do
         local attachment = source:getId()
         local id = ATWOB.mirrorAttachment(attachment)
-        isBody = isBody or source:getBone() ~= nil
-        if not script:getAttachmentById(id) then
-            if pcall(addMirror, script, source, id) then
-                added = added + 1
-            elseif source:getBone() then
-                -- The slot still works on the vanilla attachment, its item just overlaps the first one.
-                print("Second Back Slot: could not add the model attachment " .. id .. ", using " .. attachment)
-                group:getOrCreateLocation(ATWOB.mirrorLocation(locationOf[attachment])):setAttachmentName(attachment)
+        local onBody = source:getBone() ~= nil
+        isBody = isBody or onBody
+        if script:getAttachmentById(id) then
+            if onBody then ATWOB.mirrored[attachment] = true end
+        elseif pcall(addMirror, script, source, id) then
+            added = added + 1
+            if onBody then ATWOB.mirrored[attachment] = true end
+        elseif onBody then
+            -- The slot still works on the original attachment, its item just overlaps the first one.
+            print("Second Back Slot: could not add the model attachment " .. id .. ", using " .. attachment)
+            for location in pairs(locationsOf[attachment]) do
+                group:getOrCreateLocation(ATWOB.mirrorLocation(location)):setAttachmentName(attachment)
             end
+            ATWOB.mirrored[attachment] = true
         end
     end
     if added > 0 and not VANILLA_BODIES[script:getFullType()] then
@@ -176,26 +248,32 @@ function ATWOB.addMirrors(script)
     return added
 end
 
--- Adds the mirrored attachments to every model with the vanilla back
--- attachments, and returns how many it added. Those are the vanilla bodies, the
--- ones a body mod draws characters with instead (HumanVisual's
--- forceModelScript), and item models placed by them. Without them, a Back 2
--- item has no attachment on the body and is drawn at the model's root, between
--- the legs, or misses its own placement. Only clients draw the models, so a
--- server skips this.
+-- Adds the mirrored attachments to every model with back attachments, and
+-- returns how many it added. Those are the vanilla bodies, the ones a body mod
+-- draws characters with instead (HumanVisual's forceModelScript), and item
+-- models placed by them. Without them, a Back 2 item has no attachment on the
+-- body and is drawn at the model's root, between the legs, or misses its own
+-- placement. Only clients draw the models, so a server skips this.
 function ATWOB.addModelAttachments()
     if isServer() then
         return 0
     end
     local added = 0
     local scripts = getScriptManager():getAllModelScripts()
+    -- The bodies first tell which attachments are on the back, for the item models.
+    for i = 0, scripts:size() - 1 do
+        noteBackIds(scripts:get(i))
+    end
     for i = 0, scripts:size() - 1 do
         added = added + ATWOB.addMirrors(scripts:get(i))
     end
     return added
 end
 
-Events.OnGameBoot.Add(ATWOB.addModelAttachments)
+Events.OnGameBoot.Add(function()
+    ATWOB.addTwinLocations()
+    ATWOB.addModelAttachments()
+end)
 
 -- Scripts can be loaded again after boot. If the attachments were missing while
 -- the world loaded, rebuild the local players' models so their back items show.

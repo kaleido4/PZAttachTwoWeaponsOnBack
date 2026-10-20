@@ -35,8 +35,9 @@ local slotDef = {
 table.insert(ISHotbarAttachDefinition, slotDef)
 ATWOB.slotDef = slotDef
 
--- Takes every item type the vanilla back slot takes (other mods can add some),
--- as long as its location has a mirror.
+-- Takes every item type the vanilla back slot takes, also ones other mods add
+-- there, as long as its location has a mirror (at boot, other mods' ones get
+-- theirs once the bodies are mirrored).
 function ATWOB.syncSlotDef()
     local attachments = {}
     for _, def in ipairs(ISHotbarAttachDefinition) do
@@ -44,6 +45,8 @@ function ATWOB.syncSlotDef()
             for attachmentType, location in pairs(def.attachments) do
                 if ATWOB.BACK_LOCATIONS[location] then
                     attachments[attachmentType] = ATWOB.mirrorLocation(location)
+                else
+                    attachments[attachmentType] = ATWOB.usableTwin(location)
                 end
             end
         end
@@ -54,15 +57,27 @@ end
 ATWOB.syncSlotDef()
 Events.OnGameBoot.Add(ATWOB.syncSlotDef)
 
--- Where an item goes on our slot: with a bag on, the mirror of the vanilla bag
--- location, or "null" when it cannot be on the back with a bag (guitars).
+-- Where an item goes on our slot: with a bag on, the mirror of where the bag
+-- puts it on the first back slot, or "null" when it cannot be on the back with
+-- a bag (guitars). A backpack mod can bring its own spots; when one of them has
+-- no mirror (not on the back bone), the vanilla bag's spot, mirrored, still puts
+-- the item on the other side of the bag instead of behind it.
 function ATWOB.getLocation(hotbar, item, location)
-    local replacement = hotbar.replacements and hotbar.replacements[item:getAttachmentType()]
+    local attachmentType = item:getAttachmentType()
+    local replacement = hotbar.replacements and hotbar.replacements[attachmentType]
+    if not replacement then
+        return location
+    end
     if replacement == "null" then
         return "null"
     end
-    if replacement and ATWOB.BACK_LOCATIONS[replacement] then
-        return ATWOB.mirrorLocation(replacement)
+    local twin = ATWOB.usableTwin(replacement)
+    if twin then
+        return twin
+    end
+    local vanilla = ATWOB.VANILLA_BAG[attachmentType]
+    if vanilla and vanilla ~= "null" then
+        return ATWOB.mirrorLocation(vanilla)
     end
     return location
 end

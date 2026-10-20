@@ -213,6 +213,72 @@ test("the model a character is drawn with gets the Back 2 attachments, even one 
     eq(chr.modelResets, 1, "checked once")
 end)
 
+-- What a mod's spot needs at boot: its location twinned and the bodies mirrored.
+local function boot()
+    ATWOB.addTwinLocations()
+    ATWOB.addModelAttachments()
+    ATWOB.syncSlotDef()
+end
+
+local function wearBag(chr, hotbar, replacement)
+    chr:wear(newItem(nil, { replacement = replacement, name = replacement .. " backpack" }))
+    clothingUpdated(hotbar)
+end
+
+test("with a backpack mod's own spots, Back 2 goes on the other side of the bag", function()
+    AttachedLocations.getGroup("Human"):getOrCreateLocation("Rifle On Big Bag"):setAttachmentName("rifle_back_bigbag")
+    addBodyAttachment("rifle_back_bigbag", "Bip01_BackPack", "rifle_back_bag")
+    table.insert(ISHotbarAttachDefinition.replacements, { type = "BigBag", replacement = { Rifle = "Rifle On Big Bag" } })
+    boot()
+    local chr, hotbar = newPlayer()
+    local first, second = shotgun(chr), shotgun(chr)
+    attach(hotbar, first, BACK)
+    attach(hotbar, second, BACK2)
+    wearBag(chr, hotbar, "BigBag")
+    eq(first:getAttachedToModel(), "Rifle On Big Bag", "Back, on the mod's spot")
+    eq(second:getAttachedToModel(), "ATWOB Rifle On Big Bag", "Back 2, on its mirror")
+    checkModel(hotbar)
+end)
+
+test("a backpack mod's spot without a mirror puts Back 2 on the vanilla bag's spot, mirrored", function()
+    AttachedLocations.getGroup("Human"):getOrCreateLocation("Rifle On Odd Bag"):setAttachmentName("rifle_oddbag")
+    addBodyAttachment("rifle_oddbag", "Bip01_Spine1", "rifle_back_bag")
+    table.insert(ISHotbarAttachDefinition.replacements, { type = "OddBag", replacement = { Rifle = "Rifle On Odd Bag" } })
+    boot()
+    local chr, hotbar = newPlayer()
+    local first, second = shotgun(chr), shotgun(chr)
+    attach(hotbar, first, BACK)
+    attach(hotbar, second, BACK2)
+    wearBag(chr, hotbar, "OddBag")
+    eq(first:getAttachedToModel(), "Rifle On Odd Bag", "Back, on the mod's spot")
+    eq(second:getAttachedToModel(), "ATWOB Rifle On Back with Bag", "Back 2, beside the bag on the other side")
+    checkModel(hotbar)
+end)
+
+test("Back 2 takes back items other mods add, when their spot is on the back bone", function()
+    local back
+    for _, def in ipairs(ISHotbarAttachDefinition) do
+        if def.type == "Back" then back = def end
+    end
+    AttachedLocations.getGroup("Human"):getOrCreateLocation("Spear On Back"):setAttachmentName("spear_back")
+    addBodyAttachment("spear_back", "Bip01_BackPack", "blade_back")
+    AttachedLocations.getGroup("Human"):getOrCreateLocation("Odd On Back"):setAttachmentName("odd_back")
+    addBodyAttachment("odd_back", "Bip01_Spine1", "blade_back")
+    back.attachments.Spear = "Spear On Back"
+    back.attachments.Odd = "Odd On Back"
+    boot()
+    eq(ATWOB.slotDef.attachments.Spear, "ATWOB Spear On Back", "spear on Back 2")
+    eq(ATWOB.slotDef.attachments.Odd, nil, "not without a mirror")
+    local chr, hotbar = newPlayer()
+    local spear = chr:addItem(newItem("Spear"))
+    attach(hotbar, spear, BACK2)
+    eq(spear:getAttachedToModel(), "ATWOB Spear On Back", "spear location")
+    checkModel(hotbar)
+    back.attachments.Spear = nil
+    back.attachments.Odd = nil
+    ATWOB.syncSlotDef()
+end)
+
 local function requireStrength(level)
     SandboxVars.PZAttachTwoWeaponsOnBack.RequiredStrength = level
 end
