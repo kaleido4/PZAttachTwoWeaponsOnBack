@@ -57,8 +57,6 @@ In vanilla a crowbar (`blade_back`, -61 0 0) and a shotgun (`rifle_back`, -49 11
 
 The slot's item types are copied from the vanilla back slot at boot, so items other mods add to it work on "Back 2" too, as long as they use a vanilla back location.
 
-Backpack mods can bring their own spots for the back items (their own replacement, or the vanilla one's entries rewritten). Those have no mirror, so with such a bag "Back 2" uses the mirror of the vanilla bag's spot for the item: beside the bag on the other side. Its location without a bag, which it used before 1.0.3, is behind the bag, and the part of the item that shows is on the same side as the "Back" item. Vanilla bags never take this path: their spots have mirrors, as before.
-
 ### Compatibility
 
 - **Reorder The Hotbar** (workshop 2903771337) replaces `refresh`. Before a full refresh (whenever worn items change, and when loading) it moves every slot except "Back" and the worn items' slots to the end, since those are about to be removed. Back 2 stays, so its `reorderTheHotbar` then sorts the slots back into the player's order, but matches the items to them by their old numbers. With a belt on, the Back 2 item and the belt items then pointed at the wrong slots and came off the hotbar. The `refresh` wrapper above puts them back, and `tests/test_compat.lua` runs that mod's own code when it is installed.
@@ -84,8 +82,4 @@ tests/                                               Kahlua test runner and test
 tests/run_tests.sh
 ```
 
-The tests run on Kahlua from the game's jar and load the vanilla hotbar code (`ISHotbar`, the attach and detach actions, the slot and location definitions) and the body models from the game folder, so they check the mod against the game's own code. `test_compat.lua` also loads other hotbar mods from the Steam Workshop folder next to the game, and skips them when they are not installed.
-
-`tests/ingame/ATWOBTestBag` is a mod for trying a backpack mod's own spots in game: with any backpack on, it puts rifles and shotguns on a spot of its own, 20 cm higher and 10 cm further out than vanilla's. Link or copy it into `Zomboid/mods` and enable it with this mod: a rifle on "Back 2" should then hang beside the bag on the other side, at the vanilla bag spot's height. Leave it off otherwise.
-
-Set `PZ_DIR` if the game is not in `D:/Games/Steam/steamapps/common/ProjectZomboid`.
+The tests run on Kahlua from the game's jar and load the vanilla hotbar code (`ISHotbar`, the attach and detach actions, the slot and location definitions) and the body models from the game folder, so they check the mod against the game's own code. `test_compat.lua` also loads other hotbar mods from the Steam Workshop folder next to the game, and skips them when they are not installed. Set `PZ_DIR` if the game is not in `D:/Games/Steam/steamapps/common/ProjectZomboid`.

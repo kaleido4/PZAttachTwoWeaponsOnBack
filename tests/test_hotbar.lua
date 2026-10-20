@@ -213,33 +213,6 @@ test("the model a character is drawn with gets the Back 2 attachments, even one 
     eq(chr.modelResets, 1, "checked once")
 end)
 
-test("vanilla bags put Back 2 on the mirror of their own spot, for every item type", function()
-    local chr, hotbar = newPlayer()
-    local bag
-    for _, def in ipairs(ISHotbarAttachDefinition.replacements) do
-        if def.type == "Bag" then bag = def end
-    end
-    for attachmentType, location in pairs(bag.replacement) do
-        hotbar.replacements = { [attachmentType] = location }
-        local expected = location == "null" and "null" or ATWOB.mirrorLocation(location)
-        eq(ATWOB.getLocation(hotbar, newItem(attachmentType), "no bag"), expected, attachmentType)
-    end
-end)
-
-test("with a backpack mod's own spot, Back 2 goes beside the bag on the other side", function()
-    AttachedLocations.getGroup("Human"):getOrCreateLocation("Rifle On Big Bag"):setAttachmentName("rifle_back_bigbag")
-    table.insert(ISHotbarAttachDefinition.replacements, { type = "BigBag", replacement = { Rifle = "Rifle On Big Bag" } })
-    local chr, hotbar = newPlayer()
-    local first, second = shotgun(chr), shotgun(chr)
-    attach(hotbar, first, BACK)
-    attach(hotbar, second, BACK2)
-    chr:wear(newItem(nil, { replacement = "BigBag", name = "Big backpack" }))
-    clothingUpdated(hotbar)
-    eq(first:getAttachedToModel(), "Rifle On Big Bag", "Back, on the mod's spot")
-    eq(second:getAttachedToModel(), "ATWOB Rifle On Back with Bag", "Back 2, beside the bag on the other side")
-    checkModel(hotbar)
-end)
-
 local function requireStrength(level)
     SandboxVars.PZAttachTwoWeaponsOnBack.RequiredStrength = level
 end

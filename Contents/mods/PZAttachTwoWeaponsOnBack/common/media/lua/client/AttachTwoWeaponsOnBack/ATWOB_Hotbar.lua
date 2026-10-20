@@ -54,18 +54,6 @@ end
 ATWOB.syncSlotDef()
 Events.OnGameBoot.Add(ATWOB.syncSlotDef)
 
--- Where the vanilla bag puts each back item (ISHotbarAttachDefinition.replacements, "Bag").
-local VANILLA_BAG = {
-    BigWeapon = "Big Weapon On Back with Bag",
-    BigBlade = "Big Blade On Back with Bag",
-    Racket = "Racket Back with Bag",
-    Shovel = "Shovel Back with Bag",
-    Pan = "Pan On Back with Bag",
-    Rifle = "Rifle On Back with Bag",
-    Saucepan = "Saucepan Back with Bag",
-    Sword = "Big Blade On Back with Bag",
-}
-
 -- Where an item goes on our slot: with a bag on, the mirror of the vanilla bag
 -- location, or "null" when it cannot be on the back with a bag (guitars).
 function ATWOB.getLocation(hotbar, item, location)
@@ -75,13 +63,6 @@ function ATWOB.getLocation(hotbar, item, location)
     end
     if replacement and ATWOB.BACK_LOCATIONS[replacement] then
         return ATWOB.mirrorLocation(replacement)
-    end
-    -- A backpack mod can put the item on a spot of its own, which has no mirror.
-    -- The vanilla bag's spot, mirrored, still puts it beside the bag on the other
-    -- side; its location without a bag would be behind the bag, and show on the
-    -- same side as the first back slot's item. Vanilla bags never get here.
-    if replacement and VANILLA_BAG[item:getAttachmentType()] then
-        return ATWOB.mirrorLocation(VANILLA_BAG[item:getAttachmentType()])
     end
     return location
 end
