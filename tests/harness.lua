@@ -104,22 +104,18 @@ AttachedLocations = { groups = {} }
 function AttachedLocations.getGroup(id)
     local group = AttachedLocations.groups[id]
     if group then return group end
-    group = { locations = {}, order = {} }
+    group = { locations = {} }
     function group:getOrCreateLocation(name)
         local location = self.locations[name]
         if not location then
-            location = { id = name }
-            function location:getId() return self.id end
+            location = {}
             function location:setAttachmentName(attachment) self.attachmentName = attachment end
             function location:getAttachmentName() return self.attachmentName end
             self.locations[name] = location
-            table.insert(self.order, location)
         end
         return location
     end
     function group:getLocation(name) return self.locations[name] end
-    function group:size() return #self.order end
-    function group:getLocationByIndex(i) return self.order[i + 1] end
     function group:checkValid(name)
         if not self.locations[name] then error("no such location \"" .. tostring(name) .. "\"") end
     end
@@ -179,20 +175,6 @@ function newModelScript(fullType)
     function s:getAttachmentCount() return #self.attachments end
     function s:getAttachment(i) return self.attachments[i + 1] end
     return s
-end
-
--- Another mod's attachment on both vanilla bodies (like a backpack mod's spot),
--- copied from a vanilla one and moved a bit further out to the side.
-function addBodyAttachment(id, bone, from)
-    for _, body in ipairs({ "Base.FemaleBody", "Base.MaleBody" }) do
-        local script = getModelScript(body)
-        local source = script:getAttachmentById(from)
-        local a = ModelAttachment.new(id)
-        a:setBone(bone)
-        a:getOffset():set(source:getOffset():x(), source:getOffset():y() - 0.05, source:getOffset():z())
-        a:getRotate():set(source:getRotate():x(), source:getRotate():y(), source:getRotate():z())
-        script:addAttachment(a)
-    end
 end
 
 -- A body mod's own model: a copy of a vanilla body's attachments, moved a bit.

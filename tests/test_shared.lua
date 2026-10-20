@@ -252,50 +252,9 @@ test("an item with its own placement has every part of it as far out of the back
     end
 end)
 
-test("a backpack mod's own spot gets a Back 2 twin, mirrored on the bodies", function()
-    group:getOrCreateLocation("Rifle On Big Bag"):setAttachmentName("rifle_back_bigbag")
-    addBodyAttachment("rifle_back_bigbag", "Bip01_BackPack", "rifle_back_bag")
-    ATWOB.addTwinLocations()
-    ATWOB.addModelAttachments()
-    eq(group:getLocation("ATWOB Rifle On Big Bag"):getAttachmentName(), "atwob_rifle_back_bigbag", "twin location")
-    for _, body in ipairs(BODIES) do
-        local script = getModelScript(body)
-        local mirror = script:getAttachmentById("atwob_rifle_back_bigbag")
-        truthy(mirror, body .. " mirror")
-        near(mirror:getOffset():y(), -script:getAttachmentById("rifle_back_bigbag"):getOffset():y(), body .. " offset y")
-    end
-    eq(ATWOB.usableTwin("Rifle On Big Bag"), "ATWOB Rifle On Big Bag", "usable")
-end)
-
-test("a spot that is not on the back bone gets a twin, for the server, but no mirror", function()
-    group:getOrCreateLocation("Rifle On Odd Bag"):setAttachmentName("rifle_oddbag")
-    addBodyAttachment("rifle_oddbag", "Bip01_Spine1", "rifle_back_bag")
-    ATWOB.addTwinLocations()
-    ATWOB.addModelAttachments()
-    truthy(group:getLocation("ATWOB Rifle On Odd Bag"), "twin location")
-    eq(getModelScript("Base.MaleBody"):getAttachmentById("atwob_rifle_oddbag"), nil, "no mirror")
-    eq(ATWOB.usableTwin("Rifle On Odd Bag"), nil, "not usable")
-    eq(getModelScript("Base.MaleBody"):getAttachmentById("atwob_belt_left"), nil, "belt spots are not mirrored")
-end)
-
-test("twins are made once, and never of twins", function()
-    local before = group:size()
-    ATWOB.addTwinLocations()
-    eq(group:size(), before, "no new locations the second time")
-    for i = 0, group:size() - 1 do
-        truthy(string.sub(group:getLocationByIndex(i):getId(), 1, 12) ~= "ATWOB ATWOB ", "twin of a twin")
-    end
-end)
-
 test("adding them to reloaded scripts adds them again", function()
     MODEL_SCRIPTS = loadCharacterModels()
-    -- With every location twinned, the bedroll spots (also on the back bone) get one too.
-    truthy(ATWOB.addModelAttachments() >= #BODIES * count(ATWOB.BACK_LOCATIONS), "added")
-    for _, body in ipairs(BODIES) do
-        for _, attachment in pairs(ATWOB.BACK_LOCATIONS) do
-            truthy(getModelScript(body):getAttachmentById(ATWOB.mirrorAttachment(attachment)), body .. " " .. attachment)
-        end
-    end
+    eq(ATWOB.addModelAttachments(), #BODIES * count(ATWOB.BACK_LOCATIONS), "added")
 end)
 
 test("a server leaves the body models alone", function()

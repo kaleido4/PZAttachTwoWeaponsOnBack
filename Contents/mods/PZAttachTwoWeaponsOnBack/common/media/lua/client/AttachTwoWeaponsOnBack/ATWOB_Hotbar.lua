@@ -35,9 +35,8 @@ local slotDef = {
 table.insert(ISHotbarAttachDefinition, slotDef)
 ATWOB.slotDef = slotDef
 
--- Takes every item type the vanilla back slot takes, also ones other mods add
--- there, as long as its location has a mirror (at boot, other mods' ones get
--- theirs once the bodies are mirrored).
+-- Takes every item type the vanilla back slot takes (other mods can add some),
+-- as long as its location has a mirror.
 function ATWOB.syncSlotDef()
     local attachments = {}
     for _, def in ipairs(ISHotbarAttachDefinition) do
@@ -45,8 +44,6 @@ function ATWOB.syncSlotDef()
             for attachmentType, location in pairs(def.attachments) do
                 if ATWOB.BACK_LOCATIONS[location] then
                     attachments[attachmentType] = ATWOB.mirrorLocation(location)
-                else
-                    attachments[attachmentType] = ATWOB.usableTwin(location)
                 end
             end
         end
@@ -57,27 +54,34 @@ end
 ATWOB.syncSlotDef()
 Events.OnGameBoot.Add(ATWOB.syncSlotDef)
 
--- Where an item goes on our slot: with a bag on, the mirror of where the bag
--- puts it on the first back slot, or "null" when it cannot be on the back with
--- a bag (guitars). A backpack mod can bring its own spots; when one of them has
--- no mirror (not on the back bone), the vanilla bag's spot, mirrored, still puts
--- the item on the other side of the bag instead of behind it.
+-- Where the vanilla bag puts each back item (ISHotbarAttachDefinition.replacements, "Bag").
+local VANILLA_BAG = {
+    BigWeapon = "Big Weapon On Back with Bag",
+    BigBlade = "Big Blade On Back with Bag",
+    Racket = "Racket Back with Bag",
+    Shovel = "Shovel Back with Bag",
+    Pan = "Pan On Back with Bag",
+    Rifle = "Rifle On Back with Bag",
+    Saucepan = "Saucepan Back with Bag",
+    Sword = "Big Blade On Back with Bag",
+}
+
+-- Where an item goes on our slot: with a bag on, the mirror of the vanilla bag
+-- location, or "null" when it cannot be on the back with a bag (guitars).
 function ATWOB.getLocation(hotbar, item, location)
-    local attachmentType = item:getAttachmentType()
-    local replacement = hotbar.replacements and hotbar.replacements[attachmentType]
-    if not replacement then
-        return location
-    end
+    local replacement = hotbar.replacements and hotbar.replacements[item:getAttachmentType()]
     if replacement == "null" then
         return "null"
     end
-    local twin = ATWOB.usableTwin(replacement)
-    if twin then
-        return twin
+    if replacement and ATWOB.BACK_LOCATIONS[replacement] then
+        return ATWOB.mirrorLocation(replacement)
     end
-    local vanilla = ATWOB.VANILLA_BAG[attachmentType]
-    if vanilla and vanilla ~= "null" then
-        return ATWOB.mirrorLocation(vanilla)
+    -- A backpack mod can put the item on a spot of its own, which has no mirror.
+    -- The vanilla bag's spot, mirrored, still puts it beside the bag on the other
+    -- side; its location without a bag would be behind the bag, and show on the
+    -- same side as the first back slot's item. Vanilla bags never get here.
+    if replacement and VANILLA_BAG[item:getAttachmentType()] then
+        return ATWOB.mirrorLocation(VANILLA_BAG[item:getAttachmentType()])
     end
     return location
 end
