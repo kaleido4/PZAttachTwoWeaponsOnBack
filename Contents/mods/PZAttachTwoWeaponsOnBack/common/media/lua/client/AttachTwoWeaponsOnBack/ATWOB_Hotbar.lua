@@ -16,11 +16,14 @@
         own slots when another hotbar mod mixed up the slot numbers.
       * attachItem / canBeAttached: with a bag on, vanilla moves back items
         beside it, but only for slots named "Back". Ours does the same with the
-        mirrored "with Bag" locations.
+        mirrored "with Bag" locations. attachItem is wrapped at boot, after
+        other mods, like the attach action: while an item goes on our slot,
+        other mods do not see the bag list, so they cannot move it again.
 --]]
 
 require "Hotbar/ISHotbar"
 require "Hotbar/ISHotbarAttachDefinition"
+require "TimedActions/ISAttachItemHotbar"
 
 ATWOB.SLOT_TYPE = "ATWOB_Back2"
 
@@ -251,7 +254,56 @@ function ATWOB.healSlots(hotbar)
     return true
 end
 
--- At boot, once every mod has replaced or wrapped refresh, so this runs after them all.
+-- Our slot already put its item beside the bag (ATWOB.getLocation). Some mods
+-- move every item whose location has " Back" in its name beside the bag, not
+-- only on the slot named "Back" like vanilla: Alice's Weapon Sling then puts it
+-- on the vanilla bag location, on the first back slot's side. While an item goes
+-- on our slot, they see an empty bag list; vanilla does not read it for our slot.
+local function withoutBagList(hotbar, fn, ...)
+    local replacements = hotbar.replacements
+    local empty = {}
+    hotbar.replacements = empty
+    local ok, result = pcall(fn, ...)
+    -- Unless the list was made again in the meantime.
+    if hotbar.replacements == empty then
+        hotbar.replacements = replacements
+    end
+    if not ok then
+        error(result, 0)
+    end
+    return result
+end
+
+local function installAttachItem()
+    local original_attachItem = ISHotbar.attachItem
+    function ISHotbar:attachItem(item, slot, slotIndex, slotDef, doAnim)
+        if not isOurSlot(slotDef) then
+            return original_attachItem(self, item, slot, slotIndex, slotDef, doAnim)
+        end
+        slot = ATWOB.getLocation(self, item, slot)
+        -- Vanilla only checks for "null" without the animation.
+        if doAnim and slot == "null" then
+            return
+        end
+        return withoutBagList(self, original_attachItem, self, item, slot, slotIndex, slotDef, doAnim)
+    end
+
+    -- The action attaches the item when it is done; a mod can look for the bag there too.
+    for _, name in ipairs({ "complete", "perform" }) do
+        local original = ISAttachItemHotbar[name]
+        if original then
+            ISAttachItemHotbar[name] = function(self, ...)
+                if self.hotbar and isOurSlot(self.slotDef) then
+                    return withoutBagList(self.hotbar, original, self, ...)
+                end
+                return original(self, ...)
+            end
+        end
+    end
+end
+
+-- At boot, once every mod has replaced or wrapped refresh, attachItem and the
+-- attach action, so these run after them all.
 Events.OnGameBoot.Add(function()
     if ATWOB.healInstalled then
         return
@@ -262,6 +314,7 @@ Events.OnGameBoot.Add(function()
         original_refresh(self)
         ATWOB.healSlots(self)
     end
+    installAttachItem()
 end)
 
 local original_canBeAttached = ISHotbar.canBeAttached
@@ -270,16 +323,4 @@ function ISHotbar:canBeAttached(slot, item)
         return false
     end
     return original_canBeAttached(self, slot, item)
-end
-
-local original_attachItem = ISHotbar.attachItem
-function ISHotbar:attachItem(item, slot, slotIndex, slotDef, doAnim)
-    if isOurSlot(slotDef) then
-        slot = ATWOB.getLocation(self, item, slot)
-        -- Vanilla only checks for "null" without the animation.
-        if doAnim and slot == "null" then
-            return
-        end
-    end
-    return original_attachItem(self, item, slot, slotIndex, slotDef, doAnim)
 end

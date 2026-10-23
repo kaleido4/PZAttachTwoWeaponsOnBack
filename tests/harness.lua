@@ -75,6 +75,11 @@ end
 Events = setmetatable({}, { __index = function(events, name)
     local event = { handlers = {} }
     function event.Add(fn) table.insert(event.handlers, fn) end
+    function event.Remove(fn)
+        for i, handler in ipairs(event.handlers) do
+            if handler == fn then table.remove(event.handlers, i) return end
+        end
+    end
     rawset(events, name, event)
     return event
 end })
@@ -94,6 +99,7 @@ function getText(key) return key end
 function getTextOrNull() return nil end
 function getTexture() return nil end
 function syncItemFields() end
+function getActivatedMods() return { contains = function() return false end } end
 
 ---------------------------------------------------------------------------
 -- Attached locations
@@ -394,6 +400,8 @@ function newCharacter()
     function chr:getVehicle() return nil end
     function chr:isHandItem() return false end
     function chr:isEquipped() return false end
+    function chr:getPrimaryHandItem() return nil end
+    function chr:getSecondaryHandItem() return nil end
     function chr:isTimedActionInstant() return false end
     function chr:SetVariable() end
     function chr:getWornItems()
